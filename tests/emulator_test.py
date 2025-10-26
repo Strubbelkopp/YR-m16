@@ -162,3 +162,55 @@ def test_cmp_flags():
     # CMP sets flags but does not store result
     assert cpu.flags["Z"] == 0
     assert cpu.flags["N"] == 1  # 2 - 3 = -1 => N flag set
+
+def test_load_immediate_byte():
+    cpu = CPU()
+    cpu.mem[0x72] = 69
+    program = [
+        0b1000_011_001110010, # LOAD r3, 0x72
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 69
+    assert cpu.reg[3] < 0xFF # Should fit into a byte
+
+def test_store_immediate_byte():
+    cpu = CPU()
+    cpu.reg[3] = 69
+    program = [
+        0b1001_011_001110010, # STORE r3, 0x72
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0x72] == 69
+    assert cpu.mem[0x72] < 0xFF # Should fit into a byte
+
+def test_load_immediate_word():
+    cpu = CPU()
+    cpu.mem[0x52] = 0xFE
+    cpu.mem[0x53] = 0x73
+    program = [
+        0b1010_011_001010010, # LOAD r3, 0x52
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 0xFE73
+
+def test_store_immediate_word():
+    cpu = CPU()
+    cpu.reg[3] = 0xFE73
+    program = [
+        0b1011_011_001010010, # STORE r3, 0x72
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0x52] == 0xFE
+    assert cpu.mem[0x53] == 0x73

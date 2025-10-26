@@ -69,6 +69,22 @@ class CPU:
             self.flags["N"] = int((imm & 0x8000) != 0)
         elif opcode == 0b0111:
             raise StopIteration("CPU halted!")
+        elif opcode == 0b1000 or opcode == 0b1010: # Load (imm)
+            data_size = get_bits(instr, 13) # Byte/Word
+            rD = get_bits(instr, 9, 11)
+            imm = get_bits(instr, 0, 8)
+            if data_size == 0:
+                self.reg[rD] = self.mem[imm]
+            elif data_size == 1:
+                self.reg[rD] = self.load_word(imm)
+        elif opcode == 0b1001 or opcode == 0b1011: # Store (imm)
+            data_size = get_bits(instr, 13) # Byte/Word
+            rA = get_bits(instr, 9, 11)
+            imm = get_bits(instr, 0, 8)
+            if data_size == 0:
+                self.mem[imm] = self.reg[rA]
+            elif data_size == 1:
+                self.store_word(imm, self.reg[rA])
 
     def alu(self, alu_func, rD, a, b):
         res = 0
@@ -114,12 +130,22 @@ class CPU:
                 raise IndexError(f"Calculated jump address out of memory range: 0x{addr:04x}")
             self.pc = addr
 
-    def load_program(self, program, addr=0x0000):
+    def load_word(self, addr):
+        """Load a 16-Bit word from memory at the specified address"""
+        hi = self.mem[addr]
+        lo = self.mem[addr + 1]
+        return (hi << 8) | lo
+
+    def store_word(self, addr, word):
+        """Stores a 16-Bit word in memory at the specified address"""
+        self.mem[addr]     = get_bits(word, 8, 15) # MSB
+        self.mem[addr + 1] = get_bits(word, 0, 7) # LSB
+
+    def load_program(self, program, base_addr=0x0000):
         """Load assembled program (list of 16-bit words) into memory at addr (default = 0)"""
-        for i, word in enumerate(program):
-            byte_addr = addr + 2*i
-            self.mem[byte_addr]     = get_bits(word, 8, 15) # MSB
-            self.mem[byte_addr + 1] = get_bits(word, 0, 7) # LSB
+        for i, instr in enumerate(program):
+            addr = base_addr + 2*i
+            self.store_word(addr, instr)
 
     def dump_state(self):
         print("Registers:", [r for r in self.reg])
@@ -127,8 +153,10 @@ class CPU:
         print("Next PC:", self.pc) # PC after running the instruction (points to the instruction that gets executed next)
         print("---------------------------------------")
 
-def get_bits(value, start, end):
+def get_bits(value, start, end=None):
     """Extract bits from start..end (inclusive, 0 = LSB)."""
+    if end == None:
+        end = start
     range = end - start + 1
     mask = (1 << range) - 1
     return (value >> start) & mask
