@@ -82,7 +82,7 @@ class CPU:
             rA = get_bits(instr, 9, 11)
             imm = get_bits(instr, 0, 8)
             if data_size == 0:
-                self.mem[imm] = self.reg[rA]
+                self.mem[imm] = self.reg[rA] & 0xFF
             elif data_size == 1:
                 self.store_word(imm, self.reg[rA])
 

@@ -167,7 +167,7 @@ def test_load_immediate_byte():
     cpu = CPU()
     cpu.mem[0x72] = 69
     program = [
-        0b1000_011_001110010, # LOAD r3, 0x72
+        0b1000_011_001110010, # LOADB r3, 0x72
         0b0111_000000000000   # HALT
     ]
     cpu.load_program(program)
@@ -178,15 +178,15 @@ def test_load_immediate_byte():
 
 def test_store_immediate_byte():
     cpu = CPU()
-    cpu.reg[3] = 69
+    cpu.reg[3] = 0x4A69
     program = [
-        0b1001_011_001110010, # STORE r3, 0x72
+        0b1001_011_001110010, # STOREB r3, 0x72
         0b0111_000000000000   # HALT
     ]
     cpu.load_program(program)
 
     cpu.run()
-    assert cpu.mem[0x72] == 69
+    assert cpu.mem[0x72] == 0x69 # Only lower byte should be stored
     assert cpu.mem[0x72] < 0xFF # Should fit into a byte
 
 def test_load_immediate_word():
