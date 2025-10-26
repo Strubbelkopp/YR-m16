@@ -62,11 +62,16 @@ class CPU:
             offset = to_signed(get_bits(instr, 0, 8), bits=9)
             self.jmp_relative(jmp_func, offset)
         elif opcode == 0b0110: # Move
+            source_mode = get_bits(instr, 0) # Imm/Reg
             rD = get_bits(instr, 9, 11)
-            imm = to_signed(get_bits(instr, 0, 8), bits=9)
-            self.reg[rD] = imm
-            self.flags["Z"] = int((imm & 0xFFFF) == 0)
-            self.flags["N"] = int((imm & 0x8000) != 0)
+            if source_mode == 0: # Reg
+                rA = get_bits(instr, 6, 8)
+                self.reg[rD] = self.reg[rA]
+            elif source_mode == 1: # Imm
+                imm = get_bits(instr, 1, 8)
+                self.reg[rD] = imm
+            self.flags["Z"] = int((self.reg[rD] & 0xFFFF) == 0)
+            self.flags["N"] = int((self.reg[rD] & 0x8000) != 0)
         elif opcode == 0b0111:
             raise StopIteration("CPU halted!")
         elif opcode == 0b1000 or opcode == 0b1010: # Load (imm)

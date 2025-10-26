@@ -17,7 +17,7 @@ def test_halt():
 def test_mov_immediate():
     cpu = CPU()
     program = [
-        0b0110_001_000010001,  # MOV r1, 17
+        0b0110_001_000100011,  # MOV r1, 17
         0b0111_000000000000    # HALT
     ]
     cpu.load_program(program)
@@ -30,8 +30,8 @@ def test_mov_immediate():
 def test_add():
     cpu = CPU()
     program = [
-        0b0110_000_000000101,   # MOV r0, 5
-        0b0110_001_000001010,   # MOV r1, 10
+        0b0110_000_000001011,   # MOV r0, 5
+        0b0110_001_000010101,   # MOV r1, 10
         0b0000_010_000_001_000, # ADD r2, r0, r1
         0b0111_000000000000     # HALT
     ]
@@ -43,7 +43,7 @@ def test_add():
 def test_add_immediate():
     cpu = CPU()
     program = [
-        0b0110_001_000000101,    # MOV r1, 5
+        0b0110_001_000001011,    # MOV r1, 5
         0b0001_001_001010_000,   # ADD r1, 10 (reg/imm)
         0b0111_000000000000      # HALT
     ]
@@ -55,8 +55,8 @@ def test_add_immediate():
 def test_sub():
     cpu = CPU()
     program = [
-        0b0110_000_000000101,   # MOV r0, 5
-        0b0110_001_000001000,   # MOV r1, 8
+        0b0110_000_000001011,   # MOV r0, 5
+        0b0110_001_000010001,   # MOV r1, 8
         0b0000_010_000_001_001, # SUB r2, r0, r1
         0b0111_000000000000     # HALT
     ]
@@ -87,7 +87,7 @@ def test_and_or_xor():
 def test_shl_carry_flag():
     cpu = CPU()
     program = [
-        0b0110_000_011111111,  # MOV r0, 0xFF
+        0b0110_000_111111111,  # MOV r0, 0xFF
         0b0001_000_000001_101, # SHL r0, 1
         0b0001_000_001000_101, # SHL r0, 8
         0b0111_000000000000    # HALT
@@ -121,8 +121,8 @@ def test_relative_jump_backward():
     # This program increments r0 3 times using a backward jump loop
     # Instruction offsets count in instructions (not bytes)
     program = [
-        0b0110_000_000000000,   # 0: MOV r0, 0
-        0b0110_001_000000001,   # 2: MOV r1, 1
+        0b0110_000_000000001,   # 0: MOV r0, 0
+        0b0110_001_000000011,   # 2: MOV r1, 1
         # loop start
         0b0000_000_000_001_000, # 4: ADD r0, r0, r1
         0b0000_000_000000011,   # 6: CMP r0, 3
