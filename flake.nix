@@ -42,6 +42,8 @@
         packages = with python.pkgs; [
           venvShellHook
           pip
+
+          pytest
         ];
       };
     }
