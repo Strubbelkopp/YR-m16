@@ -11,5 +11,5 @@ program = [
     0b0010_011_111111101,   # 12: JLT -3 instructions back (relative -6 bytes)
     0b0111_000000000000,    # 14: HALT
 ]
-cpu.load_program(program)
+cpu.mem.load_program(program)
 cpu.run(max_cycles=30, dump_state=True)

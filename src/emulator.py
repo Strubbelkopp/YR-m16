@@ -1,9 +1,11 @@
+from src.memory import Memory
+
 class CPU:
-    def __init__(self, mem_size=pow(2, 16)):
+    def __init__(self):
         self.reg = [0] * 8 # R0 - R6, SP (16-bit)
         self.sp = 0xFFFF # SP
         self.pc = 0
-        self.mem = [0] * mem_size # Byte-addressable memory
+        self.mem = Memory(pow(2, 16)) # Byte-addressable memory
         self.flags = {
             "Z": 0, # Zero
             "N": 0, # Negative
@@ -20,7 +22,6 @@ class CPU:
                 instr = self.fetch()
                 self.decode_execute(instr)
                 if dump_state:
-                    print("Cycle:", self.cycles)
                     self.dump_state()
                 if steps > 0:
                     steps -= 1
@@ -30,9 +31,7 @@ class CPU:
             raise
 
     def fetch(self):
-        if self.pc < 0 or self.pc + 1 >= len(self.mem):
-            raise IndexError(f"PC out of memory range: 0x{self.pc:04x}")
-        instr = self.load_word(self.pc)
+        instr = self.mem.read_word(self.pc)
         self.pc +=2
         self.cycles += 1
         return instr
@@ -74,17 +73,17 @@ class CPU:
             rD = get_bits(instr, 9, 11)
             imm = get_bits(instr, 0, 8)
             if data_size == 0:
-                self.reg[rD] = self.mem[imm]
+                self.reg[rD] = self.mem.read_byte(imm)
             elif data_size == 1:
-                self.reg[rD] = self.load_word(imm)
+                self.reg[rD] = self.mem.read_word(imm)
         elif opcode == 0b1001 or opcode == 0b1011: # Store (imm)
             data_size = get_bits(instr, 13) # Byte/Word
             rA = get_bits(instr, 9, 11)
             imm = get_bits(instr, 0, 8)
             if data_size == 0:
-                self.mem[imm] = self.reg[rA] & 0xFF
+                self.mem.write_byte(imm, self.reg[rA])
             elif data_size == 1:
-                self.store_word(imm, self.reg[rA])
+                self.mem.write_word(imm, self.reg[rA])
         elif opcode == 0b1100 or opcode == 0b1110: # Load (reg) / Pop
             data_size = get_bits(instr, 13) # Byte/Word
             is_stack_op = get_bits(instr, 0)
@@ -99,9 +98,9 @@ class CPU:
                 offset = to_signed(get_bits(instr, 1, 5), 5)
                 addr = self.reg[rAddr] + offset
                 if data_size == 0:
-                    self.reg[rD] = self.mem[addr]
+                    self.reg[rD] = self.mem.read_byte(addr)
                 elif data_size == 1:
-                    self.reg[rD] = self.load_word(addr)
+                    self.reg[rD] = self.mem.read_word(addr)
         elif opcode == 0b1101 or opcode == 0b1111: # Store (reg) / Push
             data_size = get_bits(instr, 13) # Byte/Word
             is_stack_op = get_bits(instr, 0)
@@ -116,9 +115,9 @@ class CPU:
                 offset = to_signed(get_bits(instr, 1, 5), 5)
                 addr = self.reg[rAddr] + offset
                 if data_size == 0:
-                    self.mem[addr] = self.reg[rA] & 0xFF
+                    self.mem.write_byte(addr, self.reg[rA])
                 elif data_size == 1:
-                    self.store_word(addr, self.reg[rA])
+                    self.mem.write_word(addr, self.reg[rA])
 
     def alu(self, alu_func, rD, a, b):
         res = 0
@@ -160,50 +159,33 @@ class CPU:
 
         if cond:
             addr = self.pc + ((offset - 1) * 2) # -1, since PC already was incremented
-            if addr < 0 or addr + 1 >= len(self.mem):
-                raise IndexError(f"Calculated jump address out of memory range: 0x{addr:04x}")
+            self.mem.validate_address(addr)
             self.pc = addr
-
-    def load_word(self, addr):
-        """Load a 16-Bit word from memory at the specified address"""
-        hi = self.mem[addr]
-        lo = self.mem[addr + 1]
-        return (hi << 8) | lo
-
-    def store_word(self, addr, word):
-        """Stores a 16-Bit word in memory at the specified address"""
-        self.mem[addr]     = get_bits(word, 8, 15) # MSB
-        self.mem[addr + 1] = get_bits(word, 0, 7) # LSB
 
     def pop_byte(self):
         """Pops an 8-Bit byte from the stack"""
         self.sp += 1
-        value = self.mem[self.sp]
+        value = self.mem.read_byte(self.sp)
         return value
 
     def pop_word(self):
         """Pops a 16-Bit word from the stack"""
         self.sp += 2
-        value = self.load_word(self.sp-1)
+        value = self.mem.read_word(self.sp-1)
         return value
 
     def push_byte(self, byte):
         """Pushes an 8-Bit byte to the stack"""
-        self.mem[self.sp] = byte
+        self.mem.write_byte(self.sp, byte)
         self.sp -= 1
 
     def push_word(self, word):
         """Pushes a 16-Bit word to the stack"""
-        self.store_word(self.sp-1, word)
+        self.mem.write_word(self.sp-1, word)
         self.sp -= 2
 
-    def load_program(self, program, base_addr=0x0000):
-        """Load assembled program (list of 16-bit words) into memory at addr (default = 0)"""
-        for i, instr in enumerate(program):
-            addr = base_addr + 2*i
-            self.store_word(addr, instr)
-
     def dump_state(self):
+        print("Cycle:", self.cycles)
         print("Registers:", [r for r in self.reg])
         print("Flags:", self.flags)
         print("Next PC:", self.pc) # PC after running the instruction (points to the instruction that gets executed next)
