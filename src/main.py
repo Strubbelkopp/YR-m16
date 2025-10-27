@@ -1,4 +1,5 @@
-from emulator import CPU
+from cpu import CPU
+
 cpu = CPU()
 program = [
     0b0110_000_000000001,   # 0:  MOV r0, 1

@@ -209,7 +209,6 @@ def get_bits(value, start, end=None):
     mask = (1 << range) - 1
     return (value >> start) & mask
 
-# TODO: understand this
 def to_signed(value, bits):
     """Interpret value (unsigned) as signed with `bits` bits."""
     sign = 1 << (bits - 1)
