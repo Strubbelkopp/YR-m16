@@ -60,12 +60,10 @@ class CPU:
             rD = get_bits(instr, 9, 11)
             if source_mode == 0: # Reg
                 rA = get_bits(instr, 6, 8)
-                self.reg[rD] = self.reg[rA]
+                self.write_register(rD, self.reg[rA])
             elif source_mode == 1: # Imm
                 imm = get_bits(instr, 1, 8)
-                self.reg[rD] = imm
-            self.flags["Z"] = int((self.reg[rD] & 0xFFFF) == 0)
-            self.flags["N"] = int((self.reg[rD] & 0x8000) != 0)
+                self.write_register(rD, imm)
         elif opcode == 0b0111:
             raise StopIteration("CPU halted!")
         elif opcode == 0b1000 or opcode == 0b1010: # Load (imm)
@@ -73,9 +71,9 @@ class CPU:
             rD = get_bits(instr, 9, 11)
             imm = get_bits(instr, 0, 8)
             if data_size == 0:
-                self.reg[rD] = self.mem.read_byte(imm)
+                self.write_register(rD, self.mem.read_byte(imm))
             elif data_size == 1:
-                self.reg[rD] = self.mem.read_word(imm)
+                self.write_register(rD, self.mem.read_word(imm))
         elif opcode == 0b1001 or opcode == 0b1011: # Store (imm)
             data_size = get_bits(instr, 13) # Byte/Word
             rA = get_bits(instr, 9, 11)
@@ -90,17 +88,17 @@ class CPU:
             rD = get_bits(instr, 9, 11)
             if is_stack_op:
                 if data_size == 0:
-                    self.reg[rD] = self.pop_byte()
+                    self.write_register(rD, self.pop_byte())
                 elif data_size == 1:
-                    self.reg[rD] = self.pop_word()
+                    self.write_register(rD, self.pop_word())
             else:
                 rAddr = get_bits(instr, 6, 8)
                 offset = to_signed(get_bits(instr, 1, 5), 5)
                 addr = self.reg[rAddr] + offset
                 if data_size == 0:
-                    self.reg[rD] = self.mem.read_byte(addr)
+                    self.write_register(rD, self.mem.read_byte(addr))
                 elif data_size == 1:
-                    self.reg[rD] = self.mem.read_word(addr)
+                    self.write_register(rD, self.mem.read_word(addr))
         elif opcode == 0b1101 or opcode == 0b1111: # Store (reg) / Push
             data_size = get_bits(instr, 13) # Byte/Word
             is_stack_op = get_bits(instr, 0)
@@ -139,10 +137,11 @@ class CPU:
         elif alu_func == 0x7: # CMP
             res = a - b
 
+        res &= 0xFFFF # Mask result to 16 bits
         if alu_func != 0x7: # Write result to destination register, except for CMP
-            self.reg[rD] = res & 0xFFFF
+            self.reg[rD] = res
         self.flags["Z"] = int((res & 0xFFFF) == 0)
-        self.flags["N"] = int((res & 0x8000) != 0)
+        self.flags["N"] = int(res >= 0x8000)
 
     def jmp_relative(self, jmp_func, offset):
         cond = False
@@ -161,6 +160,11 @@ class CPU:
             addr = self.pc + ((offset - 1) * 2) # -1, since PC already was incremented
             self.mem.validate_address(addr)
             self.pc = addr
+
+    def write_register(self, reg_num, value):
+        self.flags["Z"] = int((value & 0xFFFF) == 0)
+        self.flags["N"] = int(value >= 0x8000)
+        self.reg[reg_num] = value & 0xFFFF
 
     def pop_byte(self):
         """Pops an 8-Bit byte from the stack"""
