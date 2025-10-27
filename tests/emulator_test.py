@@ -214,3 +214,165 @@ def test_store_immediate_word():
     cpu.run()
     assert cpu.mem[0x52] == 0xFE
     assert cpu.mem[0x53] == 0x73
+
+def test_load_indirect_byte(): # Load byte from memory address [register + offset]
+    cpu = CPU()
+    cpu.reg[2] = 0xA070
+    cpu.mem[0xA070] = 69
+    cpu.mem[0xA072] = 25
+    program = [
+        0b1100_011_010_00000_0, # LOADB r3, [r2]
+        0b1100_100_010_00010_0, # LOADB r4, [r2 + 2]
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 69
+    assert cpu.reg[4] == 25
+    assert cpu.reg[3] < 0xFF # Should fit into a byte
+    assert cpu.reg[4] < 0xFF
+
+def test_store_indirect_byte(): # Store byte to memory address [register + offset]
+    cpu = CPU()
+    cpu.reg[1] = 0x4321
+    cpu.reg[3] = 0x4A69
+    cpu.reg[4] = 0xABCD
+    program = [
+        0b1101_011_001_00000_0, # STOREB r3, [r1]
+        0b1101_100_001_00010_0, # STOREB r4, [r1 + 2]
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0x4321] == 0x69 # Only lower byte should be stored
+    assert cpu.mem[0x4323] == 0xCD
+    assert cpu.mem[0x4321] < 0xFF # Should fit into a byte
+    assert cpu.mem[0x4323] < 0xFF
+
+def test_load_indirect_word(): # Load word from memory address [register + offset]
+    cpu = CPU()
+    cpu.reg[2] = 0xA070
+    cpu.mem[0xA070] = 0x69
+    cpu.mem[0xA071] = 0x42
+    cpu.mem[0xA074] = 0x12
+    cpu.mem[0xA075] = 0x34
+    program = [
+        0b1110_011_010_00000_0, # LOAD r3, [r2]
+        0b1110_100_010_00100_0, # LOAD r4, [r2 + 4]
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 0x6942
+    assert cpu.reg[4] == 0x1234
+
+def test_store_indirect_word(): # Store word to memory address [register + offset]
+    cpu = CPU()
+    cpu.reg[1] = 0x4321
+    cpu.reg[3] = 0x4A69
+    cpu.reg[4] = 0xABCD
+    program = [
+        0b1111_011_001_00000_0, # STORE r3, [r1]
+        0b1111_100_001_00010_0, # STORE r4, [r1 + 2]
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0x4321] == 0x4A
+    assert cpu.mem[0x4322] == 0x69
+    assert cpu.mem[0x4323] == 0xAB
+    assert cpu.mem[0x4324] == 0xCD
+
+def test_pop_byte():
+    cpu = CPU()
+    cpu.sp = 0xFFFE
+    cpu.mem[0xFFFF] = 69
+    program = [
+        0b1100_011_00000000_1, # POPB r3
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 69
+    assert cpu.reg[3] < 0xFF # Should fit into a byte
+    assert cpu.sp == 0xFFFE + 1 # Was the SP incremented?
+
+def test_push_byte():
+    cpu = CPU()
+    cpu.sp = 0xFFFF
+    cpu.reg[3] = 0x4A69
+    program = [
+        0b1101_011_00000000_1, # PUSHB r3
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0xFFFF] == 0x69
+    assert cpu.mem[0xFFFF] < 0xFF # Should fit into a byte
+    assert cpu.sp == 0xFFFF - 1 # Was the SP decremented?
+
+def test_push_pop_byte():
+    cpu = CPU()
+    cpu.mem[0xFFFE] = 0
+    cpu.reg[3] = 0xABCD
+    program = [
+        0b1101_011_00000000_1,  # PUSH r3
+        0b1100_010_00000000_1,  # POP r2
+        0b0111_000000000000    # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0xFFFE] == 0 # Upper bit should not get stored
+    assert cpu.reg[2] == 0xCD # Only lower byte should get loaded
+    assert cpu.sp == 0xFFFF # Stack pointer returns to original position
+
+def test_pop_word():
+    cpu = CPU()
+    cpu.sp = 0xFFFD
+    cpu.mem[0xFFFE] = 0x4A
+    cpu.mem[0xFFFF] = 0x69
+    program = [
+        0b1110_011_00000000_1, # POP r3
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[3] == 0x4A69
+    assert cpu.sp == 0xFFFD + 2 # Was the SP incremented?
+
+def test_push_word():
+    cpu = CPU()
+    cpu.sp = 0xFFFF
+    cpu.reg[3] = 0x4A69
+    program = [
+        0b1111_011_00000000_1, # PUSH r3
+        0b0111_000000000000   # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.mem[0xFFFE] == 0x4A
+    assert cpu.mem[0xFFFF] == 0x69
+    assert cpu.sp == 0xFFFF - 2 # Was the SP decremented?
+
+def test_push_pop_word():
+    cpu = CPU()
+    cpu.reg[3] = 0xABCD
+    program = [
+        0b1111_011_00000000_1,  # PUSH r3
+        0b1110_010_00000000_1,  # POP r2
+        0b0111_000000000000    # HALT
+    ]
+    cpu.load_program(program)
+
+    cpu.run()
+    assert cpu.reg[2] == 0xABCD
+    assert cpu.sp == 0xFFFF # Stack pointer returns to original position

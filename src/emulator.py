@@ -1,6 +1,7 @@
 class CPU:
     def __init__(self, mem_size=pow(2, 16)):
         self.reg = [0] * 8 # R0 - R6, SP (16-bit)
+        self.sp = 0xFFFF # SP
         self.pc = 0
         self.mem = [0] * mem_size # Byte-addressable memory
         self.flags = {
@@ -35,9 +36,7 @@ class CPU:
     def fetch(self):
         if self.pc < 0 or self.pc + 1 >= len(self.mem):
             raise IndexError(f"PC out of memory range: 0x{self.pc:04x}")
-        hi = self.mem[self.pc]
-        lo = self.mem[self.pc + 1]
-        instr = (hi << 8) | lo
+        instr = self.load_word(self.pc)
         self.pc +=2
         self.cycles += 1
         return instr
@@ -90,6 +89,40 @@ class CPU:
                 self.mem[imm] = self.reg[rA] & 0xFF
             elif data_size == 1:
                 self.store_word(imm, self.reg[rA])
+        elif opcode == 0b1100 or opcode == 0b1110: # Load (reg) / Pop
+            data_size = get_bits(instr, 13) # Byte/Word
+            is_stack_op = get_bits(instr, 0)
+            rD = get_bits(instr, 9, 11)
+            if is_stack_op:
+                if data_size == 0:
+                    self.reg[rD] = self.pop_byte()
+                elif data_size == 1:
+                    self.reg[rD] = self.pop_word()
+            else:
+                rAddr = get_bits(instr, 6, 8)
+                offset = to_signed(get_bits(instr, 1, 5), 5)
+                addr = self.reg[rAddr] + offset
+                if data_size == 0:
+                    self.reg[rD] = self.mem[addr]
+                elif data_size == 1:
+                    self.reg[rD] = self.load_word(addr)
+        elif opcode == 0b1101 or opcode == 0b1111: # Store (reg) / Push
+            data_size = get_bits(instr, 13) # Byte/Word
+            is_stack_op = get_bits(instr, 0)
+            rA = get_bits(instr, 9, 11)
+            if is_stack_op:
+                if data_size == 0:
+                    self.push_byte(self.reg[rA] & 0xFF)
+                elif data_size == 1:
+                    self.push_word(self.reg[rA])
+            else:
+                rAddr = get_bits(instr, 6, 8)
+                offset = to_signed(get_bits(instr, 1, 5), 5)
+                addr = self.reg[rAddr] + offset
+                if data_size == 0:
+                    self.mem[addr] = self.reg[rA] & 0xFF
+                elif data_size == 1:
+                    self.store_word(addr, self.reg[rA])
 
     def alu(self, alu_func, rD, a, b):
         res = 0
@@ -146,6 +179,28 @@ class CPU:
         self.mem[addr]     = get_bits(word, 8, 15) # MSB
         self.mem[addr + 1] = get_bits(word, 0, 7) # LSB
 
+    def pop_byte(self):
+        """Pops an 8-Bit byte from the stack"""
+        self.sp += 1
+        value = self.mem[self.sp]
+        return value
+
+    def pop_word(self):
+        """Pops a 16-Bit word from the stack"""
+        self.sp += 2
+        value = self.load_word(self.sp-1)
+        return value
+
+    def push_byte(self, byte):
+        """Pushes an 8-Bit byte to the stack"""
+        self.mem[self.sp] = byte
+        self.sp -= 1
+
+    def push_word(self, word):
+        """Pushes a 16-Bit word to the stack"""
+        self.store_word(self.sp-1, word)
+        self.sp -= 2
+
     def load_program(self, program, base_addr=0x0000):
         """Load assembled program (list of 16-bit words) into memory at addr (default = 0)"""
         for i, instr in enumerate(program):
@@ -157,6 +212,16 @@ class CPU:
         print("Flags:", self.flags)
         print("Next PC:", self.pc) # PC after running the instruction (points to the instruction that gets executed next)
         print("---------------------------------------")
+
+    @property
+    def sp(self):
+        """Return the stack pointer (R7)."""
+        return self.reg[7]
+
+    @sp.setter
+    def sp(self, value):
+        """Set the stack pointer (R7)."""
+        self.reg[7] = value
 
 def get_bits(value, start, end=None):
     """Extract bits from start..end (inclusive, 0 = LSB)."""
