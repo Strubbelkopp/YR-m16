@@ -94,10 +94,10 @@ def test_shl_carry_flag():
     ]
     cpu.load_program(program)
 
-    cpu.step(2)
+    cpu.run(2)
     assert cpu.reg[0] == 0x1fe
     assert cpu.flags["C"] == 0
-    cpu.step()
+    cpu.run()
     assert cpu.reg[0] == 0xfe00
     assert cpu.flags["C"] == 1
 
@@ -111,7 +111,7 @@ def test_relative_jump_forward():
     ]
     cpu.load_program(program)
 
-    cpu.step(2)
+    cpu.run(2)
     assert cpu.pc == 6  # JZ skipped one instruction ahead
     cpu.run()
     assert cpu.reg[0] == 0
@@ -131,19 +131,19 @@ def test_relative_jump_backward():
     ]
     cpu.load_program(program)
 
-    cpu.step(2) # Initialize registers
-    cpu.step()  # ADD r0 += r1
+    cpu.run(2) # Initialize registers
+    cpu.run(1)  # ADD r0 += r1
     assert cpu.reg[0] == 1
-    cpu.step(2)  # CMP & JNZ -2
+    cpu.run(2)  # CMP & JNZ -2
     # PC should go back to ADD instruction
     assert cpu.pc == 4
-    cpu.step()  # ADD r0 += r1 again
+    cpu.run(1)  # ADD r0 += r1 again
     assert cpu.reg[0] == 2
-    cpu.step(2)  # CMP & JNZ -2
+    cpu.run(2)  # CMP & JNZ -2
     assert cpu.pc == 4
-    cpu.step()  # ADD r0 += r1 third time
+    cpu.run(1)  # ADD r0 += r1 third time
     assert cpu.reg[0] == 3
-    cpu.step(2)  # CMP & JNZ -2
+    cpu.run(2)  # CMP & JNZ -2
     assert cpu.pc == 4
     cpu.run()
     assert cpu.pc == 12

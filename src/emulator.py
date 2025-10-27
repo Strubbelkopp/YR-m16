@@ -12,26 +12,22 @@ class CPU:
         }
         self.cycles = 0
 
-    def run(self, max_cycles=10_000_000, dump_state=False):
+    def run(self, steps=-1, max_cycles=10_000_000, dump_state=False):
         try:
-            while True:
+            while steps != 0:
                 if self.cycles >= max_cycles:
                     raise RuntimeError("Max cycles exceeded!")
-                self.step(1, dump_state)
-        except StopIteration:
+                instr = self.fetch()
+                self.decode_execute(instr)
+                if dump_state:
+                    print("Cycle:", self.cycles)
+                    self.dump_state()
+                if steps > 0:
+                    steps -= 1
+        except StopIteration: # Exit on HALT instruction
             return
         except Exception:
             raise
-
-    def step(self, steps=1, dump_state=False):
-        remaining_steps = steps
-        while remaining_steps > 0:
-            instr = self.fetch()
-            self.decode_execute(instr)
-            if dump_state:
-                print("Cycle:", self.cycles)
-                self.dump_state()
-            remaining_steps -= 1
 
     def fetch(self):
         if self.pc < 0 or self.pc + 1 >= len(self.mem):
