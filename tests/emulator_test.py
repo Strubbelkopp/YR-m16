@@ -215,11 +215,11 @@ def test_store_immediate_word(cpu):
     assert cpu.mem.data[0x53] == 0x73
 
 @pytest.mark.parametrize("instruction, addr, offset, value, zero_flag, negative_flag", [
-    (0b1100_011_010_00000_0, 0xA070,  0, 0,   True,  False),
-    (0b1100_011_010_00010_0, 0xA070,  2, 25,  False, False),
-    (0b1100_011_010_11011_0, 0xA070, -5, 123, False, False),
-    (0b1100_011_010_00001_0, 0xFFFF,  1, 42,  False, False),
-    (0b1100_011_010_11111_0, 0x0000, -1, 99,  False, False),
+    (0b1100_011_010_00000_0, 0xA070,  0, 0,   True,  False), # LOADB r3, [r2]
+    (0b1100_011_010_00010_0, 0xA070,  2, 25,  False, False), # LOADB r3, [r2 + 2]
+    (0b1100_011_010_11011_0, 0xA070, -5, 123, False, False), # LOADB r3, [r2 - 5]
+    (0b1100_011_010_00001_0, 0xFFFF,  1, 42,  False, False), # LOADB r3, [0xFFFF + 1] (wraps to 0x0000)
+    (0b1100_011_010_11111_0, 0x0000, -1, 99,  False, False), # LOADB r3, [0x0000 - 1] (wraps to 0xFFFF)
 ], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
 def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, negative_flag):
     cpu.reg[2] = addr # Holds base address
@@ -231,65 +231,66 @@ def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, ne
     cpu.pc = 0x0100
 
     cpu.run(1)
-    assert cpu.reg[3] == value
+    assert cpu.reg[3] == value & 0xFF
     assert cpu.reg[3] <= 0xFF # Should fit into a byte
     assert cpu.flags["Z"] == int(zero_flag)
     assert cpu.flags["N"] == int(negative_flag)
 
-def test_store_indirect_byte(cpu): # Store byte to memory address [register + offset]
-    cpu.reg[1] = 0x4321
-    cpu.reg[3] = 0x4A69
-    cpu.reg[4] = 0xABCD
-    program = [
-        0b1101_011_001_00000_0, # STOREB r3, [r1]
-        0b1101_100_001_00010_0, # STOREB r4, [r1 + 2]
-    ]
-    cpu.mem.load_program(program)
-
-    cpu.run(2)
-    assert cpu.mem.data[0x4321] == 0x69 # Only lower byte should be stored
-    assert cpu.mem.data[0x4323] == 0xCD
-    assert cpu.mem.data[0x4321] < 0xFF # Should fit into a byte
-    assert cpu.mem.data[0x4323] < 0xFF
-
-def test_load_indirect_word(cpu): # Load word from memory address [register + offset]
-    cpu.reg[2] = 0xA070
-    cpu.flags["Z"] = 1
-    cpu.flags["N"] = 0
-    cpu.mem.data[0xA070] = 0xF9
-    cpu.mem.data[0xA071] = 0x42
-    cpu.mem.data[0xA074] = 0x12
-    cpu.mem.data[0xA075] = 0x34
-    program = [
-        0b1110_011_010_00000_0, # LOAD r3, [r2]
-        0b1110_100_010_00100_0, # LOAD r4, [r2 + 4]
-    ]
-    cpu.mem.load_program(program)
+@pytest.mark.parametrize("instruction, addr, offset, value", [
+    (0b1101_011_001_00000_0, 0x4321,  0, 0x1200), # STOREB r3, [r1]
+    (0b1101_011_001_00010_0, 0x4321,  2, 0x3419), # STOREB r3, [r1 + 2]
+    (0b1101_011_001_11111_0, 0x4321, -1, 0x567B), # STOREB r3, [r1 - 1]
+    (0b1101_011_001_00001_0, 0xFFFF,  1, 0x782A), # STOREB r3, [0xFFFF + 1] (wraps to 0x0000)
+    (0b1101_011_001_11111_0, 0x0000, -1, 0x9A63), # STOREB r3, [0x0000 - 1] (wraps to 0xFFFF)
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+def test_store_indirect_byte(cpu, instruction, addr, offset, value):
+    cpu.reg[1] = addr # Holds base address
+    cpu.reg[3] = value
+    cpu.mem.load_program([instruction], base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.pc = 0x0100
 
     cpu.run(1)
-    assert cpu.reg[3] == 0xF942
-    assert cpu.flags["Z"] == 0
-    assert cpu.flags["N"] == 1
+    assert cpu.mem.data[(addr + offset) & 0xFFFF] == value & 0xFF # Only lower byte should be stored
+    assert cpu.mem.data[(addr + offset) & 0xFFFF] <= 0xFF # Should fit into a byte
+
+@pytest.mark.parametrize("instruction, addr, offset, value, zero_flag, negative_flag", [
+    (0b1110_011_010_00000_0, 0xA070,  0, 0x0000, True,  False), # LOAD r3, [r2]
+    (0b1110_011_010_00010_0, 0xA070,  2, 0x1234, False, False), # LOAD r3, [r2 + 2]
+    (0b1110_011_010_11011_0, 0xA070, -5, 0xABCD, False, True),  # LOAD r3, [r2 - 5]
+    (0b1110_011_010_00001_0, 0xFFFF,  1, 0x42,   False, False), # LOAD r3, [0xFFFF + 1] (wraps to 0x0000)
+    (0b1110_011_010_11111_0, 0x0000, -1, 0x99,   False, False), # LOAD r3, [0x0000 - 1] (wraps to 0xFFFF)
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+def test_load_indirect_word(cpu, instruction, addr, offset, value, zero_flag, negative_flag):
+    cpu.reg[2] = addr # Holds base address
+    cpu.reg[3] = 0xABCD # Initial value should be overwritten
+    cpu.flags["Z"] = int(not zero_flag)
+    cpu.flags["N"] = int(not negative_flag)
+    cpu.mem.data[(addr + offset) & 0xFFFF] = (value >> 8) & 0xFF
+    cpu.mem.data[(addr + offset + 1) & 0xFFFF] = value & 0xFF
+    cpu.mem.load_program([instruction], base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.pc = 0x0100
+
     cpu.run(1)
-    assert cpu.reg[4] == 0x1234
-    assert cpu.flags["Z"] == 0
-    assert cpu.flags["N"] == 0
+    assert cpu.reg[3] == value
+    assert cpu.flags["Z"] == int(zero_flag)
+    assert cpu.flags["N"] == int(negative_flag)
 
-def test_store_indirect_word(cpu): # Store word to memory address [register + offset]
-    cpu.reg[1] = 0x4321
-    cpu.reg[3] = 0x4A69
-    cpu.reg[4] = 0xABCD
-    program = [
-        0b1111_011_001_00000_0, # STORE r3, [r1]
-        0b1111_100_001_00010_0, # STORE r4, [r1 + 2]
-    ]
-    cpu.mem.load_program(program)
+@pytest.mark.parametrize("instruction, addr, offset, value", [
+    (0b1111_011_001_00000_0, 0x4321,  0, 0x0000), # STORE r3, [r1]
+    (0b1111_011_001_00010_0, 0x4321,  2, 0x1234), # STORE r3, [r1 + 2]
+    (0b1111_011_001_11111_0, 0x4321, -1, 0x7B9A), # STORE r3, [r1 - 1]
+    (0b1111_011_001_00001_0, 0xFFFF,  1, 0x2A3B), # STORE r3, [0xFFFF + 1] (wraps to 0x0000)
+    (0b1111_011_001_11111_0, 0x0000, -1, 0x6364), # STORE r3, [0x0000 - 1] (wraps to 0xFFFF)
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+def test_store_indirect_word(cpu, instruction, addr, offset, value):
+    cpu.reg[1] = addr # Holds base address
+    cpu.reg[3] = value
+    cpu.mem.load_program([instruction], base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.pc = 0x0100
 
-    cpu.run(2)
-    assert cpu.mem.data[0x4321] == 0x4A
-    assert cpu.mem.data[0x4322] == 0x69
-    assert cpu.mem.data[0x4323] == 0xAB
-    assert cpu.mem.data[0x4324] == 0xCD
+    cpu.run(1)
+    assert cpu.mem.data[(addr + offset) & 0xFFFF] == (value >> 8) & 0xFF
+    assert cpu.mem.data[(addr + offset + 1) & 0xFFFF] == value & 0xFF
 
 def test_pop_byte(cpu):
     cpu.sp = 0xFFFE
