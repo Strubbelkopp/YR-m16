@@ -213,11 +213,11 @@ class CPU:
         self.mem.write_word(self.sp-1, word)
         self.sp -= 2
 
-    def dump_state(self):
+    def dump_state(self, data_format="hex"):
         print("Cycle:", self.cycles)
-        print("Registers:", [r for r in self.reg])
+        print("Registers:", [format_num(r, data_format) for r in self.reg])
         print("Flags:", self.flags)
-        print("Next PC:", self.pc) # PC after running the instruction (points to the instruction that gets executed next)
+        print("Next PC:", format_num(self.pc, "hex")) # PC after running the instruction (points to the instruction that gets executed next)
         print("---------------------------------------")
 
     @property
@@ -242,3 +242,13 @@ def to_signed(value, bits):
     """Interpret value (unsigned) as signed with `bits` bits."""
     sign = 1 << (bits - 1)
     return (value ^ sign) - sign
+
+def format_num(num, data_format):
+    if data_format == "hex":
+        return f"0x{num:04X}"
+    elif data_format == "bin":
+        return f"0b{num:016b}"
+    elif data_format == "signed":
+        return to_signed(num, 16)
+    else:
+        return num
