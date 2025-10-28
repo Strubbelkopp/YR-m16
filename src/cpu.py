@@ -158,8 +158,7 @@ class CPU:
 
         if cond:
             addr = self.pc + ((offset - 1) * 2) # -1, since PC already was incremented
-            self.mem.validate_address(addr)
-            self.pc = addr
+            self.pc = addr & 0xFFFF
 
     def write_register(self, reg_num, value):
         self.flags["Z"] = int((value & 0xFFFF) == 0)
