@@ -40,17 +40,15 @@ class CPU:
         opcode = get_bits(instr, 12, 15)
 
         if opcode == 0b0000: # ALU (reg/reg)
-            rD = get_bits(instr, 9, 11)
-            rA = get_bits(instr, 6, 8)
-            rB = get_bits(instr, 3, 5)
-            alu_func = get_bits(instr, 0, 2)
-            self.alu(alu_func, rD, self.reg[rA], self.reg[rB])
+            rA = get_bits(instr, 9, 11)
+            rB = get_bits(instr, 6, 8)
+            alu_func = get_bits(instr, 0, 3)
+            self.alu(alu_func, rA, self.reg[rA], self.reg[rB])
         elif opcode == 0b0001: # ALU (reg/imm)
-            rD = get_bits(instr, 9, 11)
-            rA = rD
-            imm = get_bits(instr, 3, 8)
-            alu_func = get_bits(instr, 0, 2)
-            self.alu(alu_func, rD, self.reg[rA], imm)
+            rA = get_bits(instr, 9, 11)
+            imm = get_bits(instr, 4, 8)
+            alu_func = get_bits(instr, 0, 3)
+            self.alu(alu_func, rA, self.reg[rA], imm)
         elif opcode == 0b0010: # Relative jump
             jmp_func = get_bits(instr, 9, 11)
             offset = to_signed(get_bits(instr, 0, 8), bits=9)
@@ -121,26 +119,54 @@ class CPU:
         res = 0
         if alu_func == 0x0: # ADD
             res = a + b
-        elif alu_func == 0x1: # SUB
+            self.flags["C"] = int(res > 0xFFFF)
+        elif alu_func == 0x1: # ADC
+            res = a + b + self.flags["C"]
+            self.flags["C"] = int(res > 0xFFFF)
+        elif alu_func == 0x2: # SUB
             res = a - b
-        elif alu_func == 0x2: # AND
+            self.flags["C"] = int(a < b)
+        elif alu_func == 0x3: # SBB
+            res = a - b - self.flags["C"]
+            self.flags["C"] = int(a < (b + self.flags["C"]))
+        elif alu_func == 0x4: # AND
             res = a & b
-        elif alu_func == 0x3: # OR
+        elif alu_func == 0x5: # OR
             res = a | b
-        elif alu_func == 0x4: # XOR
+        elif alu_func == 0x6: # XOR
             res = a ^ b
-        elif alu_func == 0x5: # SHL
-            res = a << b
-            self.flags["C"] = int((res & 0x10000) != 0)  # bit 16 is carry
-        elif alu_func == 0x6: # SHR
-            res = a >> (b & 0xFF)
-        elif alu_func == 0x7: # CMP
+        elif alu_func == 0x7: # SHL
+            shift = b & 0xF # Limit shifts to 0-15
+            res = a << shift
+            self.flags["C"] = (a >> (16 - shift)) & 1
+        elif alu_func == 0x8: # ROL
+            shift = b & 0xF # Limit shifts to 0-15
+            res = (a << shift) | (a >> (16 - shift))
+            self.flags["C"] = res & 1
+        elif alu_func == 0x9: # SHR
+            shift = b & 0xF # Limit shifts to 0-15
+            res = a >> shift
+            self.flags["C"] = (a >> (shift - 1)) & 1
+        elif alu_func == 0xA: # ASR
+            shift = b & 0xF # Limit shifts to 0-15
+            sign = (a >> 15) & 1
+            res = (a >> shift) | ((0xFFFF << (16 - shift)) if sign else 0)
+            self.flags["C"] = (a >> (shift - 1)) & 1
+        elif alu_func == 0xB: # ROR
+            shift = b & 0xF # Limit shifts to 0-15
+            res = (a >> shift) | (a << (16 - shift))
+            self.flags["C"] = (res >> 15) & 1
+        elif alu_func == 0xC: # CMP
             res = a - b
+        elif alu_func == 0xD: # NOT
+            res = ~a
+        elif alu_func == 0xE: # NEG
+            res = -a
 
         res &= 0xFFFF # Mask result to 16 bits
-        if alu_func != 0x7: # Write result to destination register, except for CMP
+        if alu_func != 0xC: # Write result to destination register, except for CMP
             self.reg[rD] = res
-        self.flags["Z"] = int((res & 0xFFFF) == 0)
+        self.flags["Z"] = int(res == 0)
         self.flags["N"] = int(res >= 0x8000)
 
     def jmp_relative(self, jmp_func, offset):
