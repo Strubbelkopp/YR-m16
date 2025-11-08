@@ -2,8 +2,8 @@ from src.memory import Memory
 
 class CPU:
     def __init__(self):
-        self.reg = [0] * 8 # R0 - R6, SP (16-bit)
-        self.sp = 0xFFFF # SP
+        self.reg = [0] * 9 # R0 - R6, SP, PC (16-bit)
+        self.sp = 0xFFFF # Stack grows downwards
         self.pc = 0
         self.mem = Memory(pow(2, 16)) # Byte-addressable memory
         self.flags = {
@@ -19,7 +19,7 @@ class CPU:
             while steps != 0:
                 if self.cycles >= max_cycles:
                     raise RuntimeError("Max cycles exceeded!")
-                instr = self.fetch()
+                instr = self.fetch_word()
                 self.decode_execute(instr)
                 if dump_state:
                     self.dump_state()
@@ -30,205 +30,234 @@ class CPU:
         except Exception:
             raise
 
-    def fetch(self):
-        instr = self.mem.read_word(self.pc)
-        self.pc +=2
-        self.cycles += 1
-        return instr
-
     def decode_execute(self, instr):
-        opcode = get_bits(instr, 12, 15)
+        instr_type = get_bits(instr, 14, 15)
+        opcode = get_bits(instr, 10, 13)
+        reg = get_bits(instr, 7, 9) # Source register A / destination register (3 bits)
+        operand = get_bits(instr, 3, 6) # Source register B / small immediate (4 bits)
+        addressing_mode = get_bits(instr, 0, 2)
 
-        if opcode == 0b0000: # ALU (reg/reg)
-            rA = get_bits(instr, 9, 11)
-            rB = get_bits(instr, 6, 8)
-            alu_func = get_bits(instr, 0, 3)
-            self.alu(alu_func, rA, self.reg[rA], self.reg[rB])
-        elif opcode == 0b0001: # ALU (reg/imm)
-            rA = get_bits(instr, 9, 11)
-            imm = get_bits(instr, 4, 8)
-            alu_func = get_bits(instr, 0, 3)
-            self.alu(alu_func, rA, self.reg[rA], imm)
-        elif opcode == 0b0010: # Relative jump
-            jmp_func = get_bits(instr, 9, 11)
-            offset = to_signed(get_bits(instr, 0, 8), bits=9)
-            self.jmp_relative(jmp_func, offset)
-        elif opcode == 0b0110: # Move
-            source_mode = get_bits(instr, 0) # Imm/Reg
-            rD = get_bits(instr, 9, 11)
-            if source_mode == 0: # Reg
-                rA = get_bits(instr, 6, 8)
-                self.write_register(rD, self.reg[rA])
-            elif source_mode == 1: # Imm
-                imm = get_bits(instr, 1, 8)
-                self.write_register(rD, imm)
-        elif opcode == 0b0111:
-            raise StopIteration("CPU halted!")
-        elif opcode == 0b1000 or opcode == 0b1010: # Load (imm)
-            data_size = get_bits(instr, 13) # Byte/Word
-            rD = get_bits(instr, 9, 11)
-            imm = get_bits(instr, 0, 8)
-            if data_size == 0:
-                self.write_register(rD, self.mem.read_byte(imm))
-            elif data_size == 1:
-                self.write_register(rD, self.mem.read_word(imm))
-        elif opcode == 0b1001 or opcode == 0b1011: # Store (imm)
-            data_size = get_bits(instr, 13) # Byte/Word
-            rA = get_bits(instr, 9, 11)
-            imm = get_bits(instr, 0, 8)
-            if data_size == 0:
-                self.mem.write_byte(imm, self.reg[rA])
-            elif data_size == 1:
-                self.mem.write_word(imm, self.reg[rA])
-        elif opcode == 0b1100 or opcode == 0b1110: # Load (reg) / Pop
-            data_size = get_bits(instr, 13) # Byte/Word
-            is_stack_op = get_bits(instr, 0)
-            rD = get_bits(instr, 9, 11)
-            if is_stack_op:
-                if data_size == 0:
-                    self.write_register(rD, self.pop_byte())
-                elif data_size == 1:
-                    self.write_register(rD, self.pop_word())
-            else:
-                rAddr = get_bits(instr, 6, 8)
-                offset = to_signed(get_bits(instr, 1, 5), 5)
-                addr = self.reg[rAddr] + offset
-                if data_size == 0:
-                    self.write_register(rD, self.mem.read_byte(addr))
-                elif data_size == 1:
-                    self.write_register(rD, self.mem.read_word(addr))
-        elif opcode == 0b1101 or opcode == 0b1111: # Store (reg) / Push
-            data_size = get_bits(instr, 13) # Byte/Word
-            is_stack_op = get_bits(instr, 0)
-            rA = get_bits(instr, 9, 11)
-            if is_stack_op:
-                if data_size == 0:
-                    self.push_byte(self.reg[rA] & 0xFF)
-                elif data_size == 1:
-                    self.push_word(self.reg[rA])
-            else:
-                rAddr = get_bits(instr, 6, 8)
-                offset = to_signed(get_bits(instr, 1, 5), 5)
-                addr = self.reg[rAddr] + offset
-                if data_size == 0:
-                    self.mem.write_byte(addr, self.reg[rA])
-                elif data_size == 1:
-                    self.mem.write_word(addr, self.reg[rA])
+        if instr_type == 0b00: # General instructions
+            if opcode == 0b0000: # NOP
+                return
+            elif opcode == 0b0001: # HALT
+                raise StopIteration("CPU halted!")
+            elif opcode == 0b0010: # RET
+                return_addr = self.pop_word()
+                self.update_program_counter(return_addr)
+            elif opcode == 0b0011: # MOV
+                b = self.apply_addressing_mode(addressing_mode, operand)
+                self.write_register(reg, b)
+        elif instr_type == 0b01: # ALU operations
+            self.exec_alu(opcode, reg, operand, addressing_mode)
+        elif instr_type == 0b10 and (opcode & 0b1000) == 0: # Jump operations
+            opcode &= 0b111
+            self.exec_jump(opcode, operand, addressing_mode)
+        elif instr_type == 0b10 and (opcode & 0b1000) != 0: # Memory/stack operations
+            opcode &= 0b111
+            self.exec_mem_stack(opcode, reg, operand, addressing_mode)
 
-    def alu(self, alu_func, rD, a, b):
-        res = 0
-        if alu_func == 0x0: # ADD
+    def exec_alu(self, opcode, rA, b, addressing_mode):
+        a = self.read_register(rA)
+        b = self.apply_addressing_mode(addressing_mode, b)
+
+        if opcode == 0x0: # ADD
             res = a + b
             self.flags["C"] = int(res > 0xFFFF)
-        elif alu_func == 0x1: # ADC
-            res = a + b + self.flags["C"]
-            self.flags["C"] = int(res > 0xFFFF)
-        elif alu_func == 0x2: # SUB
+            self.write_register(rA, res)
+        elif opcode == 0x1: # SUB
             res = a - b
             self.flags["C"] = int(a < b)
-        elif alu_func == 0x3: # SBB
-            res = a - b - self.flags["C"]
-            self.flags["C"] = int(a < (b + self.flags["C"]))
-        elif alu_func == 0x4: # AND
+            self.write_register(rA, res)
+        elif opcode == 0x2: # MUL
+            res = a * b
+            self.flags["C"] = int(res > 0xFFFF)
+            self.write_register(rA, res)
+        elif opcode == 0x3: # MULH
+            res = (a * b) >> 16
+            self.write_register(rA, res)
+        elif opcode == 0x4: # AND
             res = a & b
-        elif alu_func == 0x5: # OR
+            self.write_register(rA, res)
+        elif opcode == 0x5: # OR
             res = a | b
-        elif alu_func == 0x6: # XOR
+            self.write_register(rA, res)
+        elif opcode == 0x6: # XOR
             res = a ^ b
-        elif alu_func == 0x7: # SHL
+            self.write_register(rA, res)
+        elif opcode == 0x7: # SHL
             shift = b & 0xF # Limit shifts to 0-15
             res = a << shift
             self.flags["C"] = (a >> (16 - shift)) & 1
-        elif alu_func == 0x8: # ROL
+            self.write_register(rA, res)
+        elif opcode == 0x8: # ROL
             shift = b & 0xF # Limit shifts to 0-15
             res = (a << shift) | (a >> (16 - shift))
             self.flags["C"] = res & 1
-        elif alu_func == 0x9: # SHR
+            self.write_register(rA, res)
+        elif opcode == 0x9: # SHR
             shift = b & 0xF # Limit shifts to 0-15
             res = a >> shift
             self.flags["C"] = (a >> (shift - 1)) & 1
-        elif alu_func == 0xA: # ASR
+            self.write_register(rA, res)
+        elif opcode == 0xA: # ASR
             shift = b & 0xF # Limit shifts to 0-15
             sign = (a >> 15) & 1
             res = (a >> shift) | ((0xFFFF << (16 - shift)) if sign else 0)
             self.flags["C"] = (a >> (shift - 1)) & 1
-        elif alu_func == 0xB: # ROR
+            self.write_register(rA, res)
+        elif opcode == 0xB: # ROR
             shift = b & 0xF # Limit shifts to 0-15
             res = (a >> shift) | (a << (16 - shift))
             self.flags["C"] = (res >> 15) & 1
-        elif alu_func == 0xC: # CMP
+            self.write_register(rA, res)
+        elif opcode == 0xC: # CMP
             res = a - b
-        elif alu_func == 0xD: # NOT
+            self.update_status_flags(res)
+        elif opcode == 0xD: # NOT
             res = ~a
-        elif alu_func == 0xE: # NEG
+            self.write_register(rA, res)
+        elif opcode == 0xE: # NEG
             res = -a
+            self.write_register(rA, res)
 
-        res &= 0xFFFF # Mask result to 16 bits
-        if alu_func != 0xC: # Write result to destination register, except for CMP
-            self.reg[rD] = res
-        self.flags["Z"] = int(res == 0)
-        self.flags["N"] = int(res >= 0x8000)
+    def exec_jump(self, opcode, operand, addressing_mode):
+        addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
 
-    def jmp_relative(self, jmp_func, offset):
-        cond = False
-        if jmp_func == 0x0: # JMP
-            cond = True
-        elif jmp_func == 0x1: # JZ
-            cond = bool(self.flags["Z"])
-        elif jmp_func == 0x2: # JNZ
-            cond = not bool(self.flags["Z"])
-        elif jmp_func == 0x3: # JLT
-            cond = bool(self.flags["N"])
-        elif jmp_func == 0x4: # JGT
-            cond = not bool(self.flags["N"])
+        if opcode == 0x0: # JMP
+            self.update_program_counter(addr)
+        elif opcode == 0x1 and self.flags["Z"]: # JZ/JEQ
+            self.update_program_counter(addr)
+        elif opcode == 0x2 and not self.flags["Z"]: # JNZ/JNE
+            self.update_program_counter(addr)
+        elif opcode == 0x3 and self.flags["N"]: # JLT
+            self.update_program_counter(addr)
+        elif opcode == 0x4 and not self.flags["N"]: # JGT
+            self.update_program_counter(addr)
+        elif opcode == 0x5 and self.flags["C"]: # JC
+            self.update_program_counter(addr)
+        elif opcode == 0x6 and not self.flags["C"]: # JNC
+            self.update_program_counter(addr)
+        elif opcode == 0x7: # CALL
+            self.push_word(self.pc)
+            self.update_program_counter(addr)
 
-        if cond:
-            addr = self.pc + ((offset - 1) * 2) # -1, since PC already was incremented
-            self.pc = addr & 0xFFFF
+    def exec_mem_stack(self, opcode, rA, operand, addressing_mode):
+        addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
 
-    def write_register(self, reg_num, value):
-        self.flags["Z"] = int((value & 0xFFFF) == 0)
+        if opcode == 0x0: # LOADB
+            self.write_register(rA, self.mem.read_byte(addr))
+        elif opcode == 0x1: # LOAD
+            self.write_register(rA, self.mem.read_word(addr))
+        elif opcode == 0x2: # STOREB
+            self.mem.write_byte(addr, self.read_register(rA) & 0xFF)
+        elif opcode == 0x3: # STORE
+            self.mem.write_word(addr, self.read_register(rA))
+        elif opcode == 0x4: # POPB
+            self.write_register(rA, self.pop_byte())
+        elif opcode == 0x5: # POP
+            self.write_register(rA, self.pop_word())
+        elif opcode == 0x6: # PUSHB
+            self.push_byte(self.read_register(rA) & 0xFF)
+        elif opcode == 0x7: # PUSH
+            self.push_word(self.read_register(rA))
+        else:
+            raise NotImplementedError(f"Memory/Move operation {opcode:03b} not implemented!")
+
+    def apply_addressing_mode(self, addressing_mode, operand, fetch_addr=False):
+        if addressing_mode == 0x0: # Imm4
+            return operand
+        elif addressing_mode == 0x1: # Imm8
+            return self.fetch_byte()
+        elif addressing_mode == 0x2: # Imm16
+            return self.fetch_word()
+        elif addressing_mode == 0x3: # Reg
+            return self.read_register(operand)
+        elif addressing_mode == 0x4: # Indirect Reg
+            addr = self.read_register(operand)
+            return self.mem.read_word(addr) if not fetch_addr else addr
+        elif addressing_mode == 0x5: # Reg + Imm16(signed)
+            offset = self.fetch_word()
+            addr = self.read_register(operand) + to_signed(offset, 16)
+            return self.mem.read_word(addr) if not fetch_addr else addr
+        elif addressing_mode == 0x6: # Indirect Imm16
+            addr = self.fetch_word()
+            return self.mem.read_word(addr) if not fetch_addr else addr
+        else:
+            raise NotImplementedError(f"Addressing mode {addressing_mode:03b} not implemented!")
+
+    def read_register(self, rN):
+        if (rN > min(len(self.reg) - 1, 0b1111)): # Special registers (PC, Status register) also readable
+            raise ValueError(f"Can't read from register: {rN}")
+        return self.reg[rN]
+
+    def write_register(self, rN, value):
+        if (rN > 0b111):
+            raise ValueError(f"Can't write to register: {rN}")
+        value &= 0xFFFF
+        self.update_status_flags(value)
+        self.reg[rN] = value
+
+    def update_status_flags(self, value):
+        value &= 0xFFFF
+        self.flags["Z"] = int(value == 0)
         self.flags["N"] = int(value >= 0x8000)
-        self.reg[reg_num] = value & 0xFFFF
+
+    def update_program_counter(self, addr):
+        self.pc = addr & 0xFFFF
+
+    def fetch_byte(self):
+        value = self.mem.read_byte(self.pc)
+        self.update_program_counter(self.pc + 1)
+        self.cycles += 1
+        return value
+
+    def fetch_word(self):
+        value = self.mem.read_word(self.pc)
+        self.update_program_counter(self.pc + 2)
+        self.cycles += 1
+        return value
+
+    def update_stack_addr(self, offset):
+        # TODO: How to deal with stack overflow? Should I wrap around, throw an exception or something else?
+        return (self.sp + offset) | 0xE000 # For now wrap around, by keeping SP address in stack region (0xE000-0xFFFF)
 
     def pop_byte(self):
-        """Pops an 8-Bit byte from the stack"""
-        self.sp += 1
-        value = self.mem.read_byte(self.sp)
-        return value
+        self.sp = self.update_stack_addr(offset=1)
+        return self.mem.read_byte(self.sp)
 
     def pop_word(self):
-        """Pops a 16-Bit word from the stack"""
-        self.sp += 2
-        value = self.mem.read_word(self.sp-1)
-        return value
+        self.sp = self.update_stack_addr(offset=2)
+        return self.mem.read_word(self.sp-1)
 
     def push_byte(self, byte):
-        """Pushes an 8-Bit byte to the stack"""
         self.mem.write_byte(self.sp, byte)
-        self.sp -= 1
+        self.sp = self.update_stack_addr(offset=-1)
 
     def push_word(self, word):
-        """Pushes a 16-Bit word to the stack"""
         self.mem.write_word(self.sp-1, word)
-        self.sp -= 2
+        self.sp = self.update_stack_addr(offset=-2)
 
     def dump_state(self, data_format="hex"):
         print("Cycle:", self.cycles)
-        print("Registers:", [format_num(r, data_format) for r in self.reg])
+        print("Registers:", [f"{get_reg_name(rN)}: {format_num(r, data_format)}" for rN, r in enumerate(self.reg)])
         print("Flags:", self.flags)
         print("Next PC:", format_num(self.pc, "hex")) # PC after running the instruction (points to the instruction that gets executed next)
         print("---------------------------------------")
 
     @property
     def sp(self):
-        """Return the stack pointer (R7)."""
         return self.reg[7]
-
     @sp.setter
     def sp(self, value):
-        """Set the stack pointer (R7)."""
         self.reg[7] = value
+
+    @property
+    def pc(self):
+        return self.reg[8]
+    @pc.setter
+    def pc(self, value):
+        self.reg[8] = value
 
 def get_bits(value, start, end=None):
     """Extract bits from start..end (inclusive, 0 = LSB)."""
@@ -252,3 +281,10 @@ def format_num(num, data_format):
         return to_signed(num, 16)
     else:
         return num
+
+def get_reg_name(rN):
+    REG_NAMES = {
+        0: "R0", 1: "R1", 2: "R2", 3: "R3", 4: "R4",
+        5: "R5", 6: "R6", 7: "SP", 8: "PC"
+    }
+    return REG_NAMES.get(rN)
