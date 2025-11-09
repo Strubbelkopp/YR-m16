@@ -311,7 +311,7 @@ def test_push_byte(cpu):
     cpu.sp = 0xFFFF
     cpu.reg[3] = 0x4A69
     program = [
-        0b101_110_01, 0b1_0000_000 # PUSHB r3
+        0b101_110_00, 0b0_0011_011 # PUSHB r3
     ]
     cpu.mem.load_program(program)
 
@@ -326,7 +326,7 @@ def test_push_pop_byte(cpu):
     cpu.flags["N"] = 1
     cpu.mem.data[0xFFFE] = 0
     program = [
-        0b101_110_01, 0b1_0000_000,  # PUSHB r3
+        0b101_110_00, 0b0_0011_011,  # PUSHB r3
         0b101_100_01, 0b0_0000_000,  # POPB r2
     ]
     cpu.mem.load_program(program)
@@ -359,7 +359,7 @@ def test_push_word(cpu):
     cpu.sp = 0xFFFF
     cpu.reg[3] = 0x4A69
     program = [
-        0b101_111_01, 0b1_0000_000, # PUSH r3
+        0b101_111_00, 0b0_0011_011, # PUSH r3
     ]
     cpu.mem.load_program(program)
 
@@ -373,7 +373,7 @@ def test_push_pop_word(cpu):
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 0
     program = [
-        0b101_111_01, 0b1_0000_000,  # PUSH r3
+        0b101_111_00, 0b0_0011_011,  # PUSH r3
         0b101_101_01, 0b0_0000_000,  # POP r2
     ]
     cpu.mem.load_program(program)

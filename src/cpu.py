@@ -143,24 +143,28 @@ class CPU:
             self.update_program_counter(addr)
 
     def exec_mem_stack(self, opcode, rA, operand, addressing_mode):
-        addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
-
         if opcode == 0x0: # LOADB
+            addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
             self.write_register(rA, self.mem.read_byte(addr))
         elif opcode == 0x1: # LOAD
+            addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
             self.write_register(rA, self.mem.read_word(addr))
         elif opcode == 0x2: # STOREB
-            self.mem.write_byte(addr, self.read_register(rA) & 0xFF)
+            addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
+            self.mem.write_byte(addr, self.read_register(rA))
         elif opcode == 0x3: # STORE
+            addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
             self.mem.write_word(addr, self.read_register(rA))
         elif opcode == 0x4: # POPB
             self.write_register(rA, self.pop_byte())
         elif opcode == 0x5: # POP
             self.write_register(rA, self.pop_word())
         elif opcode == 0x6: # PUSHB
-            self.push_byte(self.read_register(rA) & 0xFF)
+            value = self.apply_addressing_mode(addressing_mode, operand)
+            self.push_byte(value)
         elif opcode == 0x7: # PUSH
-            self.push_word(self.read_register(rA))
+            value = self.apply_addressing_mode(addressing_mode, operand)
+            self.push_word(value)
         else:
             raise NotImplementedError(f"Memory/Move operation {opcode:03b} not implemented!")
 
