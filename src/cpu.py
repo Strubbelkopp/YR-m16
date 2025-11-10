@@ -1,18 +1,25 @@
-from src.memory import Memory
+from bus import Bus
+from devices.memory import MemoryDevice
+from devices.console import ConsoleDevice
 
 class CPU:
     def __init__(self):
+        self.cycles = 0
         self.reg = [0] * 9 # R0 - R6, SP, PC (16-bit)
-        self.sp = 0xFFFF # Stack grows downwards
+        self.sp = 0xEFFF # Stack grows downwards
         self.pc = 0
-        self.mem = Memory(pow(2, 16)) # Byte-addressable memory
+        self.bus = self.init_devices()
         self.flags = {
             "Z": 0, # Zero
             "N": 0, # Negative
             "C": 0, # Carry
             "V": 0  # Overflow
         }
-        self.cycles = 0
+
+    def init_devices(self):
+        memory = MemoryDevice("memory", 0x0000, 0xEFFF)
+        console = ConsoleDevice("console", 0xF000, 0xF001, memory)
+        return Bus([memory, console])
 
     def run(self, steps=-1, max_cycles=10_000_000, dump_state=False):
         try:
@@ -21,6 +28,9 @@ class CPU:
                     raise RuntimeError("Max cycles exceeded!")
                 instr = self.fetch_word()
                 self.decode_execute(instr)
+                for device in self.bus.devices:
+                    if hasattr(device, "tick"):
+                        device.tick()
                 if dump_state:
                     self.dump_state()
                 if steps > 0:
@@ -145,16 +155,16 @@ class CPU:
     def exec_mem_stack(self, opcode, rA, operand, addressing_mode):
         if opcode == 0x0: # LOADB
             addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
-            self.write_register(rA, self.mem.read_byte(addr))
+            self.write_register(rA, self.bus.read_byte(addr))
         elif opcode == 0x1: # LOAD
             addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
-            self.write_register(rA, self.mem.read_word(addr))
+            self.write_register(rA, self.bus.read_word(addr))
         elif opcode == 0x2: # STOREB
             addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
-            self.mem.write_byte(addr, self.read_register(rA))
+            self.bus.write_byte(addr, self.read_register(rA))
         elif opcode == 0x3: # STORE
             addr = self.apply_addressing_mode(addressing_mode, operand, fetch_addr=True)
-            self.mem.write_word(addr, self.read_register(rA))
+            self.bus.write_word(addr, self.read_register(rA))
         elif opcode == 0x4: # POPB
             self.write_register(rA, self.pop_byte())
         elif opcode == 0x5: # POP
@@ -179,14 +189,14 @@ class CPU:
             return self.read_register(operand)
         elif addressing_mode == 0x4: # Indirect Reg
             addr = self.read_register(operand)
-            return self.mem.read_word(addr) if not fetch_addr else addr
-        elif addressing_mode == 0x5: # Reg + Imm16(signed)
+            return self.bus.read_word(addr) if not fetch_addr else addr
+        elif addressing_mode == 0x5: # Indirect Reg + Imm16(signed)
             offset = self.fetch_word()
             addr = self.read_register(operand) + to_signed(offset, 16)
-            return self.mem.read_word(addr) if not fetch_addr else addr
+            return self.bus.read_word(addr) if not fetch_addr else addr
         elif addressing_mode == 0x6: # Indirect Imm16
             addr = self.fetch_word()
-            return self.mem.read_word(addr) if not fetch_addr else addr
+            return self.bus.read_word(addr) if not fetch_addr else addr
         else:
             raise NotImplementedError(f"Addressing mode {addressing_mode:03b} not implemented!")
 
@@ -211,35 +221,34 @@ class CPU:
         self.pc = addr & 0xFFFF
 
     def fetch_byte(self):
-        value = self.mem.read_byte(self.pc)
+        value = self.bus.read_byte(self.pc)
         self.update_program_counter(self.pc + 1)
         self.cycles += 1
         return value
 
     def fetch_word(self):
-        value = self.mem.read_word(self.pc)
+        value = self.bus.read_word(self.pc)
         self.update_program_counter(self.pc + 2)
         self.cycles += 1
         return value
 
     def update_stack_addr(self, offset):
-        # TODO: How to deal with stack overflow? Should I wrap around, throw an exception or something else?
-        return (self.sp + offset) | 0xE000 # For now wrap around, by keeping SP address in stack region (0xE000-0xFFFF)
+        return (self.sp + offset) | 0xE000
 
     def pop_byte(self):
         self.sp = self.update_stack_addr(offset=1)
-        return self.mem.read_byte(self.sp)
+        return self.bus.read_byte(self.sp)
 
     def pop_word(self):
         self.sp = self.update_stack_addr(offset=2)
-        return self.mem.read_word(self.sp-1)
+        return self.bus.read_word(self.sp-1)
 
     def push_byte(self, byte):
-        self.mem.write_byte(self.sp, byte)
+        self.bus.write_byte(self.sp, byte)
         self.sp = self.update_stack_addr(offset=-1)
 
     def push_word(self, word):
-        self.mem.write_word(self.sp-1, word)
+        self.bus.write_word(self.sp-1, word)
         self.sp = self.update_stack_addr(offset=-2)
 
     def dump_state(self, data_format="hex"):
