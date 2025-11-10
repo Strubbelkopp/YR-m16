@@ -1,3 +1,6 @@
-.direnv/
-.venv/
 __pycache__/
+.direnv/
+.pytest_cache/
+.venv/
+.vscode/
+*.bin

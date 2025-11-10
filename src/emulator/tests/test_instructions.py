@@ -11,7 +11,7 @@ def test_halt(cpu):
         0b00_0001_00, 0b00000000,  # HALT
         0b0110_001_0, 0b00010001,  # MOV r1, 17
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(max_cycles=10)
     assert cpu.cycles == 1
@@ -23,7 +23,7 @@ def test_mov_immediate_byte(cpu):
     program = [
         0b00_0011_00, 0b1_0000_001, 17  # MOV r1, 17
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[1] == 17
@@ -36,7 +36,7 @@ def test_mov_immediate_word(cpu):
     program = [
         0b00_0011_00, 0b0_0000_010, 0xFE, 0x73  # MOV r0, 0xFE73
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(4)
     assert cpu.reg[0] == 0xFE73
@@ -50,7 +50,7 @@ def test_add_immediate(cpu):
     program = [
         0b01_0000_00, 0b0_1010_000,   # ADD r0, 10
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[0] == 15
@@ -66,7 +66,7 @@ def test_arithmetic_ops(cpu, instruction, r0, r1, expected_value, zero_flag, neg
     cpu.reg[1] = r1
     cpu.flags["Z"] = int(not zero_flag)
     cpu.flags["N"] = int(not negative_flag)
-    cpu.mem.load_program(instruction)
+    cpu.bus.memory.load_program(instruction)
 
     cpu.run(1)
     assert cpu.reg[0] == expected_value
@@ -83,7 +83,7 @@ def test_logic_ops(cpu, instruction, r0, r1, expected_value, zero_flag, negative
     cpu.reg[1] = r1
     cpu.flags["Z"] = int(not zero_flag)
     cpu.flags["N"] = int(not negative_flag)
-    cpu.mem.load_program(instruction)
+    cpu.bus.memory.load_program(instruction)
 
     cpu.run(1)
     assert cpu.reg[0] == expected_value
@@ -105,7 +105,7 @@ def test_logic_ops(cpu, instruction, r0, r1, expected_value, zero_flag, negative
 def test_shift_ops(cpu, instruction, r0, expected_value, carry_flag):
     cpu.reg[0] = r0
     cpu.flags["C"] = int(not carry_flag)
-    cpu.mem.load_program(instruction)
+    cpu.bus.memory.load_program(instruction)
 
     cpu.run(1)
     assert cpu.reg[0] == expected_value
@@ -118,7 +118,7 @@ def test_relative_jump_forward(cpu):
         0b101_100_00, 0b0_0101_000, # MOV r0, 5 (should be skipped)
         0b00_0001_00, 0b00000000,  # HALT
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.pc == 6
@@ -134,7 +134,7 @@ def test_relative_jump_backward(cpu):
         0b100_011_00, 0b0_1000_101, 0b11111111, 0b11111010, # JLT (pc - 6)
         0b101_100_00, 0b0_0101_000, # MOV r0, 5 (should be skipped)
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.pc == 0
@@ -151,7 +151,7 @@ def test_cmp_flags(cpu):
         0b01_1100_00, 0b0_0001_011, # CMP r0, r1
         0b01_1100_00, 0b1_0010_011, # CMP r1, r2
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.flags["Z"] == 0
@@ -163,11 +163,11 @@ def test_cmp_flags(cpu):
 def test_load_immediate_byte(cpu):
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.mem.data[0x72] = 69
+    cpu.bus.memory.data[0x72] = 69
     program = [
         0b101_000_01, 0b1_0000_001, 0x72, # LOADB r3, 0x72
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[3] == 69
@@ -180,21 +180,21 @@ def test_store_immediate_byte(cpu):
     program = [
         0b101_010_01, 0b1_0000_001, 0x72, # STOREB r3, 0x72
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.mem.data[0x72] == 0x69 # Only lower byte should be stored
-    assert cpu.mem.data[0x72] < 0xFF # Should fit into a byte
+    assert cpu.bus.memory.data[0x72] == 0x69 # Only lower byte should be stored
+    assert cpu.bus.memory.data[0x72] < 0xFF # Should fit into a byte
 
 def test_load_immediate_word(cpu):
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 0
-    cpu.mem.data[0x52] = 0xFE
-    cpu.mem.data[0x53] = 0x73
+    cpu.bus.memory.data[0x52] = 0xFE
+    cpu.bus.memory.data[0x53] = 0x73
     program = [
         0b101_001_01, 0b1_0000_001, 0x52, # LOAD r3, 0x52
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[3] == 0xFE73
@@ -206,11 +206,11 @@ def test_store_immediate_word(cpu):
     program = [
         0b101_011_01, 0b1_0000_001, 0x52, # STORE r3, 0x52
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.mem.data[0x52] == 0xFE
-    assert cpu.mem.data[0x53] == 0x73
+    assert cpu.bus.memory.data[0x52] == 0xFE
+    assert cpu.bus.memory.data[0x53] == 0x73
 
 @pytest.mark.parametrize("instruction, addr, offset, value, zero_flag, negative_flag", [
     ([0b101_000_01, 0b1_0010_100            ], 0xA070,  0, 0,   True,  False), # LOADB r3, [r2]
@@ -224,8 +224,8 @@ def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, ne
     cpu.reg[3] = 0xABCD # Initial value should be overwritten
     cpu.flags["Z"] = int(not zero_flag)
     cpu.flags["N"] = int(not negative_flag)
-    cpu.mem.data[(addr + offset) & 0xFFFF] = value
-    cpu.mem.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.bus.memory.data[(addr + offset) & 0xFFFF] = value
+    cpu.bus.memory.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
     cpu.pc = 0x0100
 
     cpu.run(1)
@@ -244,12 +244,12 @@ def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, ne
 def test_store_indirect_byte(cpu, instruction, addr, offset, value):
     cpu.reg[1] = addr # Holds base address
     cpu.reg[3] = value
-    cpu.mem.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.bus.memory.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
     cpu.pc = 0x0100
 
     cpu.run(1)
-    assert cpu.mem.data[(addr + offset) & 0xFFFF] == value & 0xFF # Only lower byte should be stored
-    assert cpu.mem.data[(addr + offset) & 0xFFFF] <= 0xFF # Should fit into a byte
+    assert cpu.bus.memory.data[(addr + offset) & 0xFFFF] == value & 0xFF # Only lower byte should be stored
+    assert cpu.bus.memory.data[(addr + offset) & 0xFFFF] <= 0xFF # Should fit into a byte
 
 @pytest.mark.parametrize("instruction, addr, offset, value, zero_flag, negative_flag", [
     ([0b101_001_01, 0b1_0010_100            ], 0xA070,  0, 0x0000, True,  False), # LOAD r3, [r2]
@@ -263,9 +263,9 @@ def test_load_indirect_word(cpu, instruction, addr, offset, value, zero_flag, ne
     cpu.reg[3] = 0xABCD # Initial value should be overwritten
     cpu.flags["Z"] = int(not zero_flag)
     cpu.flags["N"] = int(not negative_flag)
-    cpu.mem.data[(addr + offset) & 0xFFFF] = (value >> 8) & 0xFF
-    cpu.mem.data[(addr + offset + 1) & 0xFFFF] = value & 0xFF
-    cpu.mem.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.bus.memory.data[(addr + offset) & 0xFFFF] = (value >> 8) & 0xFF
+    cpu.bus.memory.data[(addr + offset + 1) & 0xFFFF] = value & 0xFF
+    cpu.bus.memory.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
     cpu.pc = 0x0100
 
     cpu.run(1)
@@ -283,22 +283,22 @@ def test_load_indirect_word(cpu, instruction, addr, offset, value, zero_flag, ne
 def test_store_indirect_word(cpu, instruction, addr, offset, value):
     cpu.reg[1] = addr # Holds base address
     cpu.reg[3] = value
-    cpu.mem.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
+    cpu.bus.memory.load_program(instruction, base_addr=0x0100) # Load program at address 0x0100, so it doesn't interfere with the "crosses_lower_boundary" test
     cpu.pc = 0x0100
 
     cpu.run(1)
-    assert cpu.mem.data[(addr + offset) & 0xFFFF] == (value >> 8) & 0xFF
-    assert cpu.mem.data[(addr + offset + 1) & 0xFFFF] == value & 0xFF
+    assert cpu.bus.memory.data[(addr + offset) & 0xFFFF] == (value >> 8) & 0xFF
+    assert cpu.bus.memory.data[(addr + offset + 1) & 0xFFFF] == value & 0xFF
 
 def test_pop_byte(cpu):
     cpu.sp = 0xFFFE
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.mem.data[0xFFFF] = 69
+    cpu.bus.memory.data[0xFFFF] = 69
     program = [
         0b101_100_01, 0b1_0000_000 # POPB r3
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[3] == 69
@@ -313,26 +313,26 @@ def test_push_byte(cpu):
     program = [
         0b101_110_00, 0b0_0011_011 # PUSHB r3
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.mem.data[0xFFFF] == 0x69
-    assert cpu.mem.data[0xFFFF] < 0xFF # Should fit into a byte
+    assert cpu.bus.memory.data[0xFFFF] == 0x69
+    assert cpu.bus.memory.data[0xFFFF] < 0xFF # Should fit into a byte
     assert cpu.sp == 0xFFFF - 1 # Was the SP decremented?
 
 def test_push_pop_byte(cpu):
     cpu.reg[3] = 0xABCD
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.mem.data[0xFFFE] = 0
+    cpu.bus.memory.data[0xFFFE] = 0
     program = [
         0b101_110_00, 0b0_0011_011,  # PUSHB r3
         0b101_100_01, 0b0_0000_000,  # POPB r2
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(2)
-    assert cpu.mem.data[0xFFFE] == 0 # Upper bit should not get stored
+    assert cpu.bus.memory.data[0xFFFE] == 0 # Upper bit should not get stored
     assert cpu.reg[2] == 0xCD # Only lower byte should get loaded
     assert cpu.sp == 0xFFFF # Stack pointer returns to original position
     assert cpu.flags["Z"] == 0
@@ -342,12 +342,12 @@ def test_pop_word(cpu):
     cpu.sp = 0xFFFD
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.mem.data[0xFFFE] = 0x4A
-    cpu.mem.data[0xFFFF] = 0x69
+    cpu.bus.memory.data[0xFFFE] = 0x4A
+    cpu.bus.memory.data[0xFFFF] = 0x69
     program = [
         0b101_101_01, 0b1_0000_000, # POP r3
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
     assert cpu.reg[3] == 0x4A69
@@ -361,11 +361,11 @@ def test_push_word(cpu):
     program = [
         0b101_111_00, 0b0_0011_011, # PUSH r3
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.mem.data[0xFFFE] == 0x4A
-    assert cpu.mem.data[0xFFFF] == 0x69
+    assert cpu.bus.memory.data[0xFFFE] == 0x4A
+    assert cpu.bus.memory.data[0xFFFF] == 0x69
     assert cpu.sp == 0xFFFF - 2 # Was the SP decremented?
 
 def test_push_pop_word(cpu):
@@ -376,7 +376,7 @@ def test_push_pop_word(cpu):
         0b101_111_00, 0b0_0011_011,  # PUSH r3
         0b101_101_01, 0b0_0000_000,  # POP r2
     ]
-    cpu.mem.load_program(program)
+    cpu.bus.memory.load_program(program)
 
     cpu.run(2)
     assert cpu.reg[2] == 0xABCD
