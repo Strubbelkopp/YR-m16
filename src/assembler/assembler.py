@@ -16,10 +16,8 @@ class Assembler():
         self.symbols = {}
         self.parser = Parser(self)
 
-    def assemble(self, program):
-        for line in program:
-            self.parser.parse_line(line)
-            self.parser.line_num += 1
+    def assemble(self, program, filename="nofile"):
+        self.parser.parse_file(program, filename)
         self.resolve_symbols()
         return self.encode_program()
 

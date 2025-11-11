@@ -32,9 +32,18 @@ OPCODES = {
 class Parser():
     def __init__(self, assembler):
         self.assembler = assembler
-        self.line_num = 1
+        self.filename = []
+        self.line_num = {}
         self.pc = 0
         self.current_scope = None # Current global scope defined by the last global label
+
+    def parse_file(self, program, filename):
+        self.filename.append(filename)
+        self.line_num[self.filename[-1]] = 1
+        for line in program:
+            self.parse_line(line)
+            self.line_num[self.filename[-1]] += 1
+        self.filename.pop() # When done, pop the filename to get the the previous one back (for imports/recursive file parsing)
 
     def parse_line(self, line: str):
         line = line.split(';')[0].strip() # Strip comments & whitespace
@@ -51,7 +60,7 @@ class Parser():
     def parse_instruction(self, tokens: List[str]):
         mnemonic = tokens[0].upper()
         if mnemonic not in OPCODES:
-            raise SyntaxError(f"Unknown instruction '{mnemonic}' (line {self.line_num})")
+            raise SyntaxError(f"Unknown instruction '{mnemonic}' (line {self.line_num[self.filename[-1]]})")
 
         instruction = { "mnemonic": mnemonic, "address": self.pc }
         operands = tokens[1:]
@@ -82,7 +91,7 @@ class Parser():
                     a, _ = self.parse_operands([operands[i+1]])
                     b, _ = self.parse_operands([operands[i+3]])
                     if a[0]["type"] == b[0]["type"]:
-                        raise SyntaxError(f"Indirect offset addressing must use a register and an immediate (line {self.line_num})")
+                        raise SyntaxError(f"Indirect offset addressing must use a register and an immediate (line {self.line_num[self.filename[-1]]})")
                     parsed_operand.append({"type": "indirect_offset", "value": {
                         # TODO: apply sign to b value (negative only possible for immediates as b)
                         # "offset_sign": operands[i+2], # TODO: can registers even have negative offset? It seems like would need an extra bit/addressing mode
@@ -92,7 +101,7 @@ class Parser():
                     addressing_mode = "indirect_offset"
                     i += 4
                 else:
-                    raise SyntaxError(f"Invalid indirect offset addressing (line {self.line_num})")
+                    raise SyntaxError(f"Invalid indirect offset addressing (line {self.line_num[self.filename[-1]]})")
             elif operand in REGISTERS:
                 value = REGISTERS[operand]
                 parsed_operand.append({"type": "register", "value": value})
@@ -124,7 +133,7 @@ class Parser():
                 parsed_operand.append({"type": "symbol_ref", "value": operand})
                 addressing_mode = "imm16"
             else:
-                raise SyntaxError(f"Invalid operand '{operand}' (line {self.line_num})")
+                raise SyntaxError(f"Invalid operand '{operand}' (line {self.line_num[self.filename[-1]]})")
             i += 1
 
         return parsed_operand, addressing_mode
@@ -156,18 +165,19 @@ class Parser():
         elif directive == "import":
             filename = tokens[1].strip("\"\'")
             if not filename[0].isalpha():
-                raise SyntaxError(f"Invalid filename {filename} (line {self.line_num})")
+                raise SyntaxError(f"Invalid filename {filename} (line {self.line_num[self.filename[-1]]})")
             with open(filename, "r") as input_file:
                 program = input_file.read().splitlines()
-                self.assembler.assemble(program)
+                self.parse_file(program, filename)
+
         else:
-            raise SyntaxError(f"Unknown directive '@{directive}' (line {self.line_num})")
+            raise SyntaxError(f"Unknown directive '@{directive}' (line {self.line_num[self.filename[-1]]})")
 
     def parse_label(self, tokens: List[str]):
         label = tokens[0].rstrip(':')
         if label.startswith('.'):
             if self.current_scope is None:
-                raise SyntaxError(f"Local label '{label}' must follow a global label (line {self.line_num})")
+                raise SyntaxError(f"Local label '{label}' must follow a global label (line {self.line_num[self.filename[-1]]})")
             full_label = f"{self.current_scope}{label}"
         else:
             self.current_scope = label

@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     with open(args.filename, "r") as input_file:
         program = input_file.read().splitlines()
-        output = assembler.assemble(program)
+        output = assembler.assemble(program, args.filename)
         print(f"Assembled \"{args.filename}\" into {len(output)} bytes.")
         if args.output:
             with open(args.output, "wb") as output_file:
