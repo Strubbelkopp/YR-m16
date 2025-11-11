@@ -1,39 +1,48 @@
 import os
 import sys
+import time
 from devices.device import Device
 
 class ConsoleDevice(Device):
-    def __init__(self, name, min_address, max_address, memory, width=80, height=24):
+    def __init__(self, name, min_address, max_address, memory, width=80, height=24, refresh_rate=30):
         super().__init__(name, min_address, max_address)
         self.base_addr = 0xC000
         self.memory = memory
         self.width = width
         self.height = height
+        self.refresh_rate = refresh_rate
+        self.last_refresh = time.time()
 
     def read_byte(self, addr):
         raise RuntimeError(f"Can't read from address: {addr}")
 
     def write_byte(self, addr, value):
-        device_addr = addr - self.min_address
-        if device_addr == 0:
+        index = addr - self.min_address
+        if index == 0:
             self.base_addr = (self.base_addr & 0x00FF) | (value << 8)
-        elif device_addr == 1:
+        elif index == 1:
             self.base_addr = (self.base_addr & 0xFF00) | value
 
     def refresh_screen(self):
-        # Clear the console
-        sys.stdout.write("\033[H\033[J")  # Move cursor to top-left, clear screen
-        sys.stdout.flush()
+        sys.stdout.write("\033[H") # Move cursor to top-left
 
-        screen_data = self.memory.data[
+        screen_data = self.memory.data[ # Extract the screen data
             self.base_addr - self.memory.min_address:
             self.base_addr - self.memory.min_address + self.width * self.height
         ]
-        lines = [screen_data[i:i+self.width] for i in range(0, len(screen_data), self.width)]
+        # Build all lines into a single string
+        lines = []
+        for i in range(0, len(screen_data), self.width):
+            # Convert bytes to printable chars
+            line = ''.join(chr(c) if c >= 32 else ' ' for c in screen_data[i:i+self.width])
+            lines.append(line)
 
-        for line in lines:
-            print(''.join(chr(c) for c in line))
+        sys.stdout.write('\n'.join(lines))
+        sys.stdout.flush()
 
-    def tick(self, cycles=1):
-        pass
-        self.refresh_screen()
+    def tick(self):
+        now = time.time()
+        if now - self.last_refresh >= 1.0 / self.refresh_rate:
+            self.refresh_screen()
+            self.last_refresh = now
+        super().tick()

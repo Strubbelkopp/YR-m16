@@ -4,11 +4,12 @@ from devices.console import ConsoleDevice
 
 class CPU:
     def __init__(self):
-        self.cycles = 0
+        self.clock_cycle = 0
+        self.halted = False
         self.reg = [0] * 9 # R0 - R6, SP, PC (16-bit)
         self.sp = 0xEFFF # Stack grows downwards
         self.pc = 0
-        self.bus = self.init_devices()
+        self.bus = self.init_devices(device_tick_rate=60)
         self.flags = {
             "Z": 0, # Zero
             "N": 0, # Negative
@@ -16,42 +17,41 @@ class CPU:
             "V": 0  # Overflow
         }
 
-    def init_devices(self):
+    def init_devices(self, device_tick_rate):
+        self.device_tick_rate = device_tick_rate
         memory = MemoryDevice("memory", 0x0000, 0xEFFF)
         console = ConsoleDevice("console", 0xF000, 0xF001, memory)
         return Bus([memory, console])
 
     def run(self, steps=-1, max_cycles=10_000_000, dump_state=False):
-        try:
-            while steps != 0:
-                if self.cycles >= max_cycles:
-                    raise RuntimeError("Max cycles exceeded!")
-                instr = self.fetch_word()
-                self.decode_execute(instr)
+        while steps != 0:
+            if self.clock_cycle >= max_cycles:
+                raise RuntimeError("Max cycles exceeded!")
+            instr = self.fetch_word()
+            self.decode_execute(instr)
+            if self.halted:
+                break
+            if (self.clock_cycle % self.device_tick_rate) == 0:
                 for device in self.bus.devices:
-                    if hasattr(device, "tick"):
-                        device.tick()
-                if dump_state:
-                    self.dump_state()
-                if steps > 0:
-                    steps -= 1
-        except StopIteration: # Exit on HALT instruction
-            return
-        except Exception:
-            raise
+                    device.tick()
+            if dump_state:
+                self.dump_state()
+            if steps > 0:
+                steps -= 1
+        self.bus.console.refresh_screen()
 
     def decode_execute(self, instr):
-        instr_type = get_bits(instr, 14, 15)
-        opcode = get_bits(instr, 10, 13)
-        reg = get_bits(instr, 7, 9) # Source register A / destination register (3 bits)
-        operand = get_bits(instr, 3, 6) # Source register B / small immediate (4 bits)
-        addressing_mode = get_bits(instr, 0, 2)
+        instr_type = (instr >> 14) & 0b11
+        opcode = (instr >> 10) & 0b1111
+        reg = (instr >> 7) & 0b111
+        operand = (instr >> 3) & 0b1111
+        addressing_mode = instr & 0b111
 
         if instr_type == 0b00: # General instructions
             if opcode == 0b0000: # NOP
                 return
             elif opcode == 0b0001: # HALT
-                raise StopIteration("CPU halted!")
+                self.halted = True
             elif opcode == 0b0010: # RET
                 return_addr = self.pop_word()
                 self.update_program_counter(return_addr)
@@ -223,13 +223,13 @@ class CPU:
     def fetch_byte(self):
         value = self.bus.read_byte(self.pc)
         self.update_program_counter(self.pc + 1)
-        self.cycles += 1
+        self.clock_cycle += 1
         return value
 
     def fetch_word(self):
         value = self.bus.read_word(self.pc)
         self.update_program_counter(self.pc + 2)
-        self.cycles += 1
+        self.clock_cycle += 1
         return value
 
     def update_stack_addr(self, offset):
@@ -252,7 +252,7 @@ class CPU:
         self.sp = self.update_stack_addr(offset=-2)
 
     def dump_state(self, data_format="hex"):
-        print("Cycle:", self.cycles)
+        print("Cycle:", self.clock_cycle)
         print("Registers:", [f"{get_reg_name(rN)}: {format_num(r, data_format)}" for rN, r in enumerate(self.reg)])
         print("Flags:", self.flags)
         print("Next PC:", format_num(self.pc, "hex")) # PC after running the instruction (points to the instruction that gets executed next)
@@ -271,14 +271,6 @@ class CPU:
     @pc.setter
     def pc(self, value):
         self.reg[8] = value
-
-def get_bits(value, start, end=None):
-    """Extract bits from start..end (inclusive, 0 = LSB)."""
-    if end == None:
-        end = start
-    range = end - start + 1
-    mask = (1 << range) - 1
-    return (value >> start) & mask
 
 def to_signed(value, bits):
     """Interpret value (unsigned) as signed with `bits` bits."""

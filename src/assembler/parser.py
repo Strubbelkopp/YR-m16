@@ -212,7 +212,7 @@ class Parser():
             elif token.isdigit():
                 data.append(int(token))
             else:
-                raise AssemblerError(f"Invalid data literal '{token}'")
+                raise SyntaxError(f"Invalid data literal '{token}'")
         return data
 
     def infer_imm_mode(self, value: int) -> str:
@@ -220,4 +220,4 @@ class Parser():
 
     def check_symbol_name(self, name):
         if name.lower() in REGISTERS:
-            raise AssemblerError(f"Reserved symbol name '{name}'")
+            raise SyntaxError(f"Reserved symbol name '{name}'")
