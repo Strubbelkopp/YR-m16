@@ -36,6 +36,7 @@ class Parser():
         self.line_num = {}
         self.pc = 0
         self.current_scope = None # Current global scope defined by the last global label
+        self.imports = []
 
     def parse_file(self, program, filename):
         self.filename.append(filename)
@@ -44,6 +45,12 @@ class Parser():
             self.parse_line(line)
             self.line_num[self.filename[-1]] += 1
         self.filename.pop() # When done, pop the filename to get the the previous one back (for imports/recursive file parsing)
+
+        for import_filename in self.imports: # Handle @import directives at the end, so the code of the current file is at the beginning of the assembled binary
+            self.imports.pop()
+            with open(import_filename, "r") as import_file:
+                program = import_file.read().splitlines()
+                self.parse_file(program, import_filename)
 
     def parse_line(self, line: str):
         line = line.split(';')[0].strip() # Strip comments & whitespace
@@ -166,9 +173,7 @@ class Parser():
             filename = tokens[1].strip("\"\'")
             if not filename[0].isalpha():
                 raise SyntaxError(f"Invalid filename {filename} (line {self.line_num[self.filename[-1]]})")
-            with open(filename, "r") as input_file:
-                program = input_file.read().splitlines()
-                self.parse_file(program, filename)
+            self.imports.append(filename)
 
         else:
             raise SyntaxError(f"Unknown directive '@{directive}' (line {self.line_num[self.filename[-1]]})")
