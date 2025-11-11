@@ -47,7 +47,7 @@ class Parser():
         self.filename.pop() # When done, pop the filename to get the the previous one back (for imports/recursive file parsing)
 
         for import_filename in self.imports: # Handle @import directives at the end, so the code of the current file is at the beginning of the assembled binary
-            self.imports.pop()
+            self.imports.remove(import_filename)
             with open(import_filename, "r") as import_file:
                 program = import_file.read().splitlines()
                 self.parse_file(program, import_filename)
