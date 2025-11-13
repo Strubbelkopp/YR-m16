@@ -1,5 +1,3 @@
-from devices.device import Device
-
 class Bus():
     def __init__(self, devices):
         self.devices = devices
@@ -15,11 +13,15 @@ class Bus():
     def read_byte(self, addr):
         addr &= 0xFFFF
         device = self.get_device(addr)
+        if device.io_type == "wo":
+            raise RuntimeError(f"Can't read from write-only device '{device.name} at address: {addr:04X}")
         return device.read_byte(addr)
 
     def write_byte(self, addr, value):
         addr &= 0xFFFF
         device = self.get_device(addr)
+        if device.io_type == "ro":
+            raise RuntimeError(f"Can't write to read-only device '{device.name} at address: {addr:04X}")
         device.write_byte(addr, value & 0xFF)
 
     def read_word(self, addr):

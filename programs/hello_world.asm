@@ -1,10 +1,10 @@
 @import "programs/lib.asm"
 
 main:
-    push str                    ; push string pointer as a function argument to the stack (set up call stack)
+    mov r0, str                    ; load pointer to "str" into r0 as an argument for "print"
     call print
-    add sp, 1                   ; bring the sp back
-    halt
+end:
+    jmp end
 
 str:
     @data "Hello World!", '\0'

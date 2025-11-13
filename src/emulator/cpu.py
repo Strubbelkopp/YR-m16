@@ -1,6 +1,7 @@
 from bus import Bus
 from devices.memory import MemoryDevice
 from devices.console import ConsoleDevice
+from devices.keyboard import KeyboardDevice
 
 class CPU:
     def __init__(self):
@@ -21,11 +22,12 @@ class CPU:
         self.device_tick_rate = device_tick_rate
         memory = MemoryDevice("memory", 0x0000, 0xEFFF)
         console = ConsoleDevice("console", 0xF000, 0xF001, memory)
-        return Bus([memory, console])
+        keyboard = KeyboardDevice("keyboard", 0xF002, 0xF003)
+        return Bus([memory, console, keyboard])
 
-    def run(self, steps=-1, max_cycles=10_000_000, dump_state=False):
+    def run(self, steps=-1, max_cycles=-1, dump_state=False):
         while steps != 0:
-            if self.clock_cycle >= max_cycles:
+            if max_cycles >= 0 and self.clock_cycle >= max_cycles:
                 raise RuntimeError("Max cycles exceeded!")
             instr = self.fetch_word()
             self.decode_execute(instr)

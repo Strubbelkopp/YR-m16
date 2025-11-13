@@ -5,16 +5,13 @@ from devices.device import Device
 
 class ConsoleDevice(Device):
     def __init__(self, name, min_address, max_address, memory, width=80, height=24, refresh_rate=30):
-        super().__init__(name, min_address, max_address)
+        super().__init__(name, min_address, max_address, io_type="wo")
         self.base_addr = 0xC000
         self.memory = memory
         self.width = width
         self.height = height
         self.refresh_rate = refresh_rate
         self.last_refresh = time.time()
-
-    def read_byte(self, addr):
-        raise RuntimeError(f"Can't read from address: {addr}")
 
     def write_byte(self, addr, value):
         index = addr - self.min_address

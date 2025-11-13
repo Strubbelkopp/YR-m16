@@ -88,7 +88,11 @@ class Parser():
         while i < len(operands):
             operand = operands[i]
 
-            if operand == '[': # Indirect memory addressing
+            if isinstance(operand, int): # TODO: where does this come from?
+                value = int(operand)
+                parsed_operand.append({"type": "number", "value": value})
+                addressing_mode = self.infer_imm_mode(value)
+            elif operand == '[': # Indirect memory addressing
                 if operands[i+2] == ']':
                     value, addressing_mode = self.parse_operands([operands[i+1]])
                     parsed_operand.append({"type": "indirect", "value": value[0]})

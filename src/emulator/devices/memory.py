@@ -1,17 +1,17 @@
 from devices.device import Device
 
 class MemoryDevice(Device):
-    def __init__(self, name, min_address, max_address, read_only=False):
-        super().__init__(name, min_address, max_address)
+    def __init__(self, name, min_address, max_address, io_type="rw"):
+        super().__init__(name, min_address, max_address, io_type)
         self.size = self.max_address - self.min_address + 1
         self.data = bytearray(self.size)
-        self.read_only = read_only
+        self.io_type = io_type
 
     def read_byte(self, addr):
         return self.data[addr]
 
     def write_byte(self, addr, value):
-        if not self.read_only:
+        if self.io_type != "ro":
             self.data[addr] = value
 
     def load_program(self, program, base_addr=0x0000):
@@ -20,7 +20,7 @@ class MemoryDevice(Device):
             self.write_byte(addr, byte)
 
     def write_bytes(self, addr, data: bytes):
-        if not self.read_only:
+        if self.io_type != "ro":
             self.data[addr : addr + len(data)] = data
 
     def dump(self, start=0, end=None):
