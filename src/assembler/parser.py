@@ -56,7 +56,7 @@ class Parser():
         line = line.split(';')[0].strip() # Strip comments & whitespace
         if not line: # Skip empty lines
             return
-        tokens = re.findall(r'\[|\]|"(?:\\.|[^"])*"|\'(?:\\.|[^\'])*\'|[^\s,\[\]]+', line)
+        tokens = re.findall(r'\[|\]|"(?:\\.|[^"])*"|\'(?:\\.|[^\'])*\'|[A-Za-z_][\w]*(?:\([^)]*\))?:?|[^\s,\[\]]+', line)
         if tokens[0].startswith('@'):
             self.parse_directive(tokens)
         elif tokens[0].endswith(':'):
@@ -179,7 +179,7 @@ class Parser():
             raise SyntaxError(f"Unknown directive '@{directive}' (line {self.line_num[self.filename[-1]]})")
 
     def parse_label(self, tokens: List[str]):
-        label = tokens[0].rstrip(':')
+        label = re.sub(r'\(.*?\)', '', tokens[0]).rstrip(':') # Strip any parameters in parentheses and the trailing colon
         if label.startswith('.'):
             if self.current_scope is None:
                 raise SyntaxError(f"Local label '{label}' must follow a global label (line {self.line_num[self.filename[-1]]})")
