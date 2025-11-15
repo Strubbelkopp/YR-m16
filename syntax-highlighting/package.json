@@ -1,0 +1,29 @@
+{
+  "name": "yr-u16-assembly",
+  "displayName": "YR-µ16 Assembly",
+  "description": "YR-µ16 Assembly syntax highlighting for VSCode",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "author": {
+    "name": "Strubbelkopp"
+  },
+  "publisher": "strubbelkopp",
+  "contributes": {
+    "languages": [{
+      "id": "yr-µ16",
+      "aliases": ["YR-µ16", "yr-µ16"],
+      "extensions": [".asm",".s"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "yr-µ16",
+      "scopeName": "source.yr-u16",
+      "path": "./syntaxes/yr-µ16.tmLanguage.json"
+    }]
+  }
+}
