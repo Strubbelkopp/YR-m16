@@ -1,8 +1,10 @@
 class Bus():
-    def __init__(self, devices):
-        self.devices = devices
-        for device in devices:
-            setattr(self, device.name, device)
+    def __init__(self):
+        self.devices = []
+
+    def attach_device(self, device):
+        self.devices.append(device)
+        setattr(self, device.name, device)
 
     def get_device(self, addr):
         for device in self.devices:

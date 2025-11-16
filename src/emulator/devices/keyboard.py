@@ -1,11 +1,6 @@
-import queue
-import threading
-import sys
+from queue import Queue
 from devices.device import Device
-try: # Platform-specific imports
-    import msvcrt
-except ImportError:
-    pass
+from unicurses import getch
 
 # Internal registers
 KEYBRD_DATA = 0
@@ -16,32 +11,37 @@ DATA_READY = 0b00000001
 class KeyboardDevice(Device):
     def __init__(self, name, min_address, max_address):
         super().__init__(name, min_address, max_address, io_type="ro")
-        self.input_buffer = queue.Queue()
+        self.input_buffer = Queue()
         self.status = 0 # Status register
-        self.thread = threading.Thread(name="keyboard_input_thread", target=self.input_thread, daemon=True)
-        self.lock = threading.Lock()
-        self.thread.start()
 
     def read_byte(self, addr):
         index = addr - self.min_address
         if index == KEYBRD_DATA:
             data = self.input_buffer.get_nowait()
-            with self.lock:
-                if self.input_buffer.empty() and (self.status & DATA_READY):
-                    self.status ^= DATA_READY # Clear data ready flag, if set
+            if self.input_buffer.empty() and (self.status & DATA_READY):
+                self.status ^= DATA_READY # Clear data ready flag, if set
             return data
         elif index == KEYBRD_STATUS:
-            with self.lock:
-                return self.status
+            return self.status
 
-    def input_thread(self):
-        if sys.platform == "win32":
-            while True:
-                self.input_windows()
+    def tick(self):
+        ch = getch()
+        if ch != -1:
+            for byte in get_key_code(self, ch):
+                self.input_buffer.put(byte)
+            self.status |= DATA_READY # Set data ready flag
+        super().tick()
 
-    def input_windows(self):
-        if msvcrt.kbhit():
-            char = msvcrt.getch()
-            self.input_buffer.put(ord(char))
-            with self.lock:
-                self.status |= DATA_READY # Set data ready flag
+def get_key_code(self, key):
+    if 0 <= key <= 255:
+        return bytes([key])
+    else:
+        EXTENDED_KEY_MAP = {
+            3:  0x48,  # Up Arrow
+            2:  0x50,  # Down Arrow
+            4:  0x4B,  # Left Arrow
+            5:  0x4D,  # Right Arrow
+            7:  0x08,  # Backspace
+            74: 0x53,  # Delete
+        }
+        return bytes([0xE0, EXTENDED_KEY_MAP.get(key & 0xFF, 0x00)])

@@ -44,6 +44,7 @@
           pip
 
           pytest
+          unicurses
         ];
       };
     }

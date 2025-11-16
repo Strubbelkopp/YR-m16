@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
-
-class Device(ABC):
+class Device():
     def __init__(self, name, min_address, max_address, io_type):
         self.name = name
         self.min_address = min_address
