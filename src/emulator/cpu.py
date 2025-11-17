@@ -2,7 +2,8 @@ from bus import Bus
 from devices.memory import MemoryDevice
 from devices.console import ConsoleDevice
 from devices.keyboard import KeyboardDevice
-from unicurses import noecho, cbreak, keypad, nodelay, curs_set, echo, clear, refresh
+from time import sleep
+
 
 class CPU:
     def __init__(self, stdscr):
@@ -17,35 +18,33 @@ class CPU:
             "C": 0, # Carry
             "V": 0  # Overflow
         }
-        self.init_curses(stdscr)
         self.init_devices(device_tick_rate=60)
 
     def init_devices(self, device_tick_rate):
         self.device_tick_rate = device_tick_rate
         self.bus = Bus()
         self.bus.attach_device(MemoryDevice("memory", 0x0000, 0xEFFF))
-        self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF001, cpu=self))
+        self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF001))
         self.bus.attach_device(KeyboardDevice("keyboard", 0xF002, 0xF003))
 
-    def run(self, steps=-1, max_cycles=-1, dump_state=False):
-        try:
-            while steps != 0:
-                if max_cycles >= 0 and self.clock_cycle >= max_cycles:
-                    raise RuntimeError("Max cycles exceeded!")
-                instr = self.fetch_word()
-                self.decode_execute(instr)
-                if self.halted:
-                    break
-                if (self.clock_cycle % self.device_tick_rate) == 0:
-                    for device in self.bus.devices:
-                        device.tick()
-                if dump_state:
-                    self.dump_state()
-                if steps > 0:
-                    steps -= 1
-        finally:
-            self.bus.console.refresh_screen()
-            self.cleanup_curses()
+    def run(self, steps=-1, max_cycles=-1, dump_state=False, ui=None):
+        while steps != 0:
+            if max_cycles >= 0 and self.clock_cycle >= max_cycles:
+                raise RuntimeError("Max cycles exceeded!")
+            instr = self.fetch_word()
+            self.decode_execute(instr)
+            if self.halted:
+                break
+            if (self.clock_cycle % self.device_tick_rate) == 0:
+                for device in self.bus.devices:
+                    device.tick()
+            if ui and self.clock_cycle % 60 == 0:
+                ui.draw()
+            if dump_state:
+                self.dump_state()
+            if steps > 0:
+                steps -= 1
+            # sleep(0.001)
 
     def decode_execute(self, instr):
         instr_type = (instr >> 14) & 0b11
@@ -278,20 +277,6 @@ class CPU:
     @pc.setter
     def pc(self, value):
         self.reg[8] = value
-
-    def init_curses(self, stdscr):
-        self.stdscr = stdscr
-        curs_set(0) # Hide cursor
-        noecho() # Don't echo input characters
-        cbreak() # Don't wait for Enter key
-        keypad(stdscr, True) # Enable special keys
-        nodelay(stdscr, True) # Non-blocking input
-    def cleanup_curses(self):
-        curs_set(1)
-        echo()
-        keypad(self.stdscr, False)
-        clear()
-        refresh()
 
 def to_signed(value, bits):
     """Interpret value (unsigned) as signed with `bits` bits."""

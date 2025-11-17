@@ -1,4 +1,4 @@
-from src.cpu import CPU
+from src.emulator.cpu import CPU
 
 import pytest
 

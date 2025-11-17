@@ -16,7 +16,6 @@
 @let key        = r0
 @let active_chr = r1
 @let cursor     = r2
-@let i          = r3
 @let tmp        = r4
 @let counter    = r5
 @let end_ptr    = 0x1000
