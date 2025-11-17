@@ -1,7 +1,7 @@
 ; Memory-mapped registers
 @let CONSOLE_BASE   = 0xF000
-@let KEYBRD_DATA    = 0xF002
-@let KEYBRD_STATUS  = 0xF003
+@let KEYBRD_DATA    = 0xF004
+@let KEYBRD_STATUS  = 0xF005
 
 ; Constants
 @let CONSOLE_START  = 0xC000                ; Initial beginning of the console text buffer

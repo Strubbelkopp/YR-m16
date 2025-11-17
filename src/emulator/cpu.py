@@ -24,8 +24,8 @@ class CPU:
         self.device_tick_rate = device_tick_rate
         self.bus = Bus()
         self.bus.attach_device(MemoryDevice("memory", 0x0000, 0xEFFF))
-        self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF001))
-        self.bus.attach_device(KeyboardDevice("keyboard", 0xF002, 0xF003))
+        self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF003))
+        self.bus.attach_device(KeyboardDevice("keyboard", 0xF004, 0xF005))
 
     def run(self, steps=-1, max_cycles=-1, dump_state=False, ui=None):
         while steps != 0:
