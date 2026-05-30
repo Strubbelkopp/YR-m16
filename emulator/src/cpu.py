@@ -1,9 +1,9 @@
 from .bus import Bus
-from .devices.memory import MemoryDevice
 from .devices.console import ConsoleDevice
 from .devices.keyboard import KeyboardDevice
-from time import sleep
+from .devices.memory import MemoryDevice
 from .ui.input import InputThread
+from time import sleep
 
 class CPU:
     def __init__(self, term=None):
@@ -161,7 +161,7 @@ class CPU:
             self.update_program_counter(addr)
         elif opcode == 0x2 and not self.flags["Z"]: # JNZ/JNE
             self.update_program_counter(addr)
-        elif opcode == 0x3 and self.flags["N"]: # JLT
+        elif opcode == 0x3 and self.flags["N"] and not self.flags["Z"]: # JLT
             self.update_program_counter(addr)
         elif opcode == 0x4 and not self.flags["N"] and not self.flags["Z"]: # JGT
             self.update_program_counter(addr)

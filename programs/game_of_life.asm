@@ -38,7 +38,7 @@ init_buffers:
     storeb state, [new_cell]
     add active_cell, 1
     add new_cell, 1
-    cmp active_cell, DISPLAY_BUFFER_B ; Whole buffer filled, once it reaches the start of the 'B' buffer
+    cmp active_cell, DISPLAY_BUFFER_B   ; Whole buffer filled, once it reaches the start of the 'B' buffer
     jne .loop
 .set_patterns:
     mov state, ALIVE
@@ -52,7 +52,7 @@ init_buffers:
 calculate_next_generation:
     load active_cell, [active_buffer]
     load new_cell, [hidden_buffer]
-    mov i, 0                            ; Initialize counter
+mov i, 0                                ; Initialize counter
 .loop:
 
 .calculate_neighbours:
@@ -112,13 +112,13 @@ calculate_next_generation:
     cmp state, ALIVE
     jne .dead
 .alive:
-    cmp neighbours, 2 ; Living cell with < 2 neighbours dies (underpopulation)
+    cmp neighbours, 2                   ; Living cell with < 2 neighbours dies (underpopulation)
     jlt .set_dead
-    cmp neighbours, 3 ; Living cell with > 3 neighbours dies (overpopulation)
+    cmp neighbours, 3                   ; Living cell with > 3 neighbours dies (overpopulation)
     jgt .set_dead
     jmp .set_new_state
 .dead:
-    cmp neighbours, 3 ; Dead cell with 3 neighbours lives (reproduction)
+    cmp neighbours, 3                   ; Dead cell with 3 neighbours lives (reproduction)
     jne .set_new_state
 .set_living:
     mov state, ALIVE
@@ -143,7 +143,7 @@ calculate_next_generation:
     store tmp, [hidden_buffer]
     ret
 
-print_neighbours: ; Debug function to print the amount of living neighbours around each cell. Call after "calculate_neighbours"
-    add neighbours, 48
+print_neighbours:                       ; Debug function to print the amount of living neighbours around each cell. Call after "calculate_neighbours"
+    add neighbours, 48                  ; Convert number to ASCII
     storeb neighbours, [new_cell]
     ret

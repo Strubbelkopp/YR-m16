@@ -1,6 +1,6 @@
-from queue import Queue
-import threading
 from .device import Device
+from queue import Queue
+from threading import Lock
 
 # Internal registers
 KEYBRD_DATA = 0
@@ -13,7 +13,7 @@ class KeyboardDevice(Device):
         super().__init__(name, min_address, max_address, io_type="ro")
         self.input_buffer = Queue()
         self.status = 0  # Status register
-        self.lock = threading.Lock()
+        self.lock = Lock()
 
     def read_byte(self, addr):
         index = addr - self.min_address

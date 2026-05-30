@@ -1,8 +1,7 @@
-import threading
-
 from ..devices.keyboard import get_key_code, DATA_READY
+from threading import Thread
 
-class InputThread(threading.Thread):
+class InputThread(Thread):
     def __init__(self, cpu):
         super().__init__(daemon=True)
         self.cpu = cpu

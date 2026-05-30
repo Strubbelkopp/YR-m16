@@ -1,8 +1,6 @@
-import sys
-
 from .windows.console_window import ConsoleWindow
-from .windows.status_window import StatusWindow
 from .windows.memory_window import MemoryWindow
+from .windows.status_window import StatusWindow
 from .windows.action_window import ActionWindow
 
 CONSOLE_H = 24 + 1

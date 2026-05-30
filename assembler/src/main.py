@@ -1,5 +1,5 @@
-from assembler import Assembler
-import argparse
+from .assembler import Assembler
+from argparse import ArgumentParser
 
 def hexdump(data, start=0, end=None):
     if end is None:
@@ -10,8 +10,8 @@ def hexdump(data, start=0, end=None):
         ascii_repr = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
         print(f"{addr:04X}: {hex_bytes:<48} {ascii_repr}")
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(prog="YR-µ16 Assembler")
+def main():
+    parser = ArgumentParser(prog="YR-µ16 Assembler")
     parser.add_argument("filename", help="source code file to assemble")
     parser.add_argument("-o", "--output", help="output file for the assembled program")
     parser.add_argument("-c", "--charset", choices=["cp437", "cp850"], default="cp437", help="charset to use for encoding chars/strings")

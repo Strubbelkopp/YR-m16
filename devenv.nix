@@ -13,4 +13,8 @@
       enable = true;
     };
   };
+
+  git-hooks.hooks = {
+    pytest.enable = true;
+  };
 }
