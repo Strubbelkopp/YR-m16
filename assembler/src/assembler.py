@@ -1,5 +1,5 @@
 from typing import Tuple
-from parser import Parser, REGISTERS, OPCODES
+from .parser import Parser, REGISTERS, OPCODES
 
 ADDRESSING_MODES = {
     "imm4": 0b000,          "imm8": 0b001,

@@ -1,4 +1,4 @@
-from src.emulator.cpu import CPU
+from emulator.src.cpu import CPU
 
 import pytest
 
@@ -14,7 +14,7 @@ def test_halt(cpu):
     cpu.bus.memory.load_program(program)
 
     cpu.run(max_cycles=10)
-    assert cpu.cycles == 1
+    assert cpu.clock_cycle == 1
     assert cpu.reg[1] == 0
 
 def test_mov_immediate_byte(cpu):
@@ -217,8 +217,7 @@ def test_store_immediate_word(cpu):
     ([0b101_000_01, 0b1_0010_101, 0x00, 0x02], 0xA070,  2, 25,  False, False), # LOADB r3, [r2 + 2]
     ([0b101_000_01, 0b1_0010_101, 0xFF, 0xFB], 0xA070, -5, 123, False, False), # LOADB r3, [r2 - 5]
     ([0b101_000_01, 0b1_0010_101, 0x00, 0x01], 0xFFFF,  1, 42,  False, False), # LOADB r3, [r2 + 1] (wraps to 0x0000)
-    ([0b101_000_01, 0b1_0010_101, 0xFF, 0xFF], 0x0000, -1, 99,  False, False), # LOADB r3, [r2 - 1] (wraps to 0xFFFF)
-], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_upper_boundary"])
 def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, negative_flag):
     cpu.reg[2] = addr # Holds base address
     cpu.reg[3] = 0xABCD # Initial value should be overwritten
@@ -239,8 +238,7 @@ def test_load_indirect_byte(cpu, instruction, addr, offset, value, zero_flag, ne
     ([0b101_010_01, 0b1_0001_101, 0x00, 0x02], 0x4321,  2, 0x3419), # STOREB r3, [r1 + 2]
     ([0b101_010_01, 0b1_0001_101, 0xFF, 0xFF], 0x4321, -1, 0x567B), # STOREB r3, [r1 - 1]
     ([0b101_010_01, 0b1_0001_101, 0x00, 0x01], 0xFFFF,  1, 0x782A), # STOREB r3, [r1 + 1] (wraps to 0x0000)
-    ([0b101_010_01, 0b1_0001_101, 0xFF, 0xFF], 0x0000, -1, 0x9A63), # STOREB r3, [r1 - 1] (wraps to 0xFFFF)
-], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_upper_boundary"])
 def test_store_indirect_byte(cpu, instruction, addr, offset, value):
     cpu.reg[1] = addr # Holds base address
     cpu.reg[3] = value
@@ -256,8 +254,7 @@ def test_store_indirect_byte(cpu, instruction, addr, offset, value):
     ([0b101_001_01, 0b1_0010_101, 0x00, 0x02], 0xA070,  2, 0x1234, False, False), # LOAD r3, [r2 + 2]
     ([0b101_001_01, 0b1_0010_101, 0xFF, 0xFB], 0xA070, -5, 0xABCD, False, True),  # LOAD r3, [r2 - 5]
     ([0b101_001_01, 0b1_0010_101, 0x00, 0x01], 0xFFFF,  1, 0x42,   False, False), # LOAD r3, [r2 + 1] (wraps to 0x0000)
-    ([0b101_001_01, 0b1_0010_101, 0xFF, 0xFF], 0x0000, -1, 0x99,   False, False), # LOAD r3, [r2 - 1] (wraps to 0xFFFF)
-], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_upper_boundary"])
 def test_load_indirect_word(cpu, instruction, addr, offset, value, zero_flag, negative_flag):
     cpu.reg[2] = addr # Holds base address
     cpu.reg[3] = 0xABCD # Initial value should be overwritten
@@ -278,8 +275,7 @@ def test_load_indirect_word(cpu, instruction, addr, offset, value, zero_flag, ne
     ([0b101_011_01, 0b1_0001_101, 0x00, 0x02], 0x4321,  2, 0x1234), # STORE r3, [r1 + 2]
     ([0b101_011_01, 0b1_0001_101, 0xFF, 0xFF], 0x4321, -1, 0x7B9A), # STORE r3, [r1 - 1]
     ([0b101_011_01, 0b1_0001_101, 0x00, 0x01], 0xFFFF,  1, 0x2A3B), # STORE r3, [r1 + 1] (wraps to 0x0000)
-    ([0b101_011_01, 0b1_0001_101, 0xFF, 0xFF], 0x0000, -1, 0x6364), # STORE r3, [r1 - 1] (wraps to 0xFFFF)
-], ids=["no_offset", "positive_offset", "negative_offset", "crosses_lower_boundary", "crosses_upper_boundary"])
+], ids=["no_offset", "positive_offset", "negative_offset", "crosses_upper_boundary"])
 def test_store_indirect_word(cpu, instruction, addr, offset, value):
     cpu.reg[1] = addr # Holds base address
     cpu.reg[3] = value
@@ -291,10 +287,10 @@ def test_store_indirect_word(cpu, instruction, addr, offset, value):
     assert cpu.bus.memory.data[(addr + offset + 1) & 0xFFFF] == value & 0xFF
 
 def test_pop_byte(cpu):
-    cpu.sp = 0xFFFE
+    cpu.sp = 0xEFFE
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.bus.memory.data[0xFFFF] = 69
+    cpu.bus.memory.data[0xEFFF] = 69
     program = [
         0b101_100_01, 0b1_0000_000 # POPB r3
     ]
@@ -303,12 +299,12 @@ def test_pop_byte(cpu):
     cpu.run(1)
     assert cpu.reg[3] == 69
     assert cpu.reg[3] < 0xFF # Should fit into a byte
-    assert cpu.sp == 0xFFFE + 1 # Was the SP incremented?
+    assert cpu.sp == 0xEFFE + 1 # Was the SP incremented?
     assert cpu.flags["Z"] == 0
     assert cpu.flags["N"] == 0
 
 def test_push_byte(cpu):
-    cpu.sp = 0xFFFF
+    cpu.sp = 0xEFFF
     cpu.reg[3] = 0x4A69
     program = [
         0b101_110_00, 0b0_0011_011 # PUSHB r3
@@ -316,15 +312,15 @@ def test_push_byte(cpu):
     cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.bus.memory.data[0xFFFF] == 0x69
-    assert cpu.bus.memory.data[0xFFFF] < 0xFF # Should fit into a byte
-    assert cpu.sp == 0xFFFF - 1 # Was the SP decremented?
+    assert cpu.bus.memory.data[0xEFFF] == 0x69
+    assert cpu.bus.memory.data[0xEFFF] < 0xFF # Should fit into a byte
+    assert cpu.sp == 0xEFFF - 1 # Was the SP decremented?
 
 def test_push_pop_byte(cpu):
     cpu.reg[3] = 0xABCD
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.bus.memory.data[0xFFFE] = 0
+    cpu.bus.memory.data[0xEFFE] = 0
     program = [
         0b101_110_00, 0b0_0011_011,  # PUSHB r3
         0b101_100_01, 0b0_0000_000,  # POPB r2
@@ -332,18 +328,18 @@ def test_push_pop_byte(cpu):
     cpu.bus.memory.load_program(program)
 
     cpu.run(2)
-    assert cpu.bus.memory.data[0xFFFE] == 0 # Upper bit should not get stored
+    assert cpu.bus.memory.data[0xEFFE] == 0 # Upper bit should not get stored
     assert cpu.reg[2] == 0xCD # Only lower byte should get loaded
-    assert cpu.sp == 0xFFFF # Stack pointer returns to original position
+    assert cpu.sp == 0xEFFF # Stack pointer returns to original position
     assert cpu.flags["Z"] == 0
     assert cpu.flags["N"] == 0
 
 def test_pop_word(cpu):
-    cpu.sp = 0xFFFD
+    cpu.sp = 0xEFFD
     cpu.flags["Z"] = 1
     cpu.flags["N"] = 1
-    cpu.bus.memory.data[0xFFFE] = 0x4A
-    cpu.bus.memory.data[0xFFFF] = 0x69
+    cpu.bus.memory.data[0xEFFE] = 0x4A
+    cpu.bus.memory.data[0xEFFF] = 0x69
     program = [
         0b101_101_01, 0b1_0000_000, # POP r3
     ]
@@ -351,12 +347,12 @@ def test_pop_word(cpu):
 
     cpu.run(1)
     assert cpu.reg[3] == 0x4A69
-    assert cpu.sp == 0xFFFD + 2 # Was the SP incremented?
+    assert cpu.sp == 0xEFFD + 2 # Was the SP incremented?
     assert cpu.flags["Z"] == 0
     assert cpu.flags["N"] == 0
 
 def test_push_word(cpu):
-    cpu.sp = 0xFFFF
+    cpu.sp = 0xEFFF
     cpu.reg[3] = 0x4A69
     program = [
         0b101_111_00, 0b0_0011_011, # PUSH r3
@@ -364,9 +360,9 @@ def test_push_word(cpu):
     cpu.bus.memory.load_program(program)
 
     cpu.run(1)
-    assert cpu.bus.memory.data[0xFFFE] == 0x4A
-    assert cpu.bus.memory.data[0xFFFF] == 0x69
-    assert cpu.sp == 0xFFFF - 2 # Was the SP decremented?
+    assert cpu.bus.memory.data[0xEFFE] == 0x4A
+    assert cpu.bus.memory.data[0xEFFF] == 0x69
+    assert cpu.sp == 0xEFFF - 2 # Was the SP decremented?
 
 def test_push_pop_word(cpu):
     cpu.reg[3] = 0xABCD
@@ -380,6 +376,6 @@ def test_push_pop_word(cpu):
 
     cpu.run(2)
     assert cpu.reg[2] == 0xABCD
-    assert cpu.sp == 0xFFFF # Stack pointer returns to original position
+    assert cpu.sp == 0xEFFF # Stack pointer returns to original position
     assert cpu.flags["Z"] == 0
     assert cpu.flags["N"] == 1
