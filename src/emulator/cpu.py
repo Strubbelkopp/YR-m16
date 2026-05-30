@@ -163,7 +163,7 @@ class CPU:
             self.update_program_counter(addr)
         elif opcode == 0x3 and self.flags["N"]: # JLT
             self.update_program_counter(addr)
-        elif opcode == 0x4 and not self.flags["N"]: # JGT
+        elif opcode == 0x4 and not self.flags["N"] and not self.flags["Z"]: # JGT
             self.update_program_counter(addr)
         elif opcode == 0x5 and self.flags["C"]: # JC
             self.update_program_counter(addr)
