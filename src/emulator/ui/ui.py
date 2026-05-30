@@ -1,8 +1,9 @@
-from unicurses import *
-from ui.windows.console_window import ConsoleWindow
-from ui.windows.status_window import StatusWindow
-from ui.windows.memory_window import MemoryWindow
-from ui.windows.action_window import ActionWindow
+import sys
+
+from .windows.console_window import ConsoleWindow
+from .windows.status_window import StatusWindow
+from .windows.memory_window import MemoryWindow
+from .windows.action_window import ActionWindow
 
 CONSOLE_H = 24 + 1
 CONSOLE_W = 80 + 4
@@ -22,20 +23,20 @@ ACTION_Y = MEMORY_Y + MEMORY_H
 ACTION_X = MEMORY_X
 
 class UI():
-    def __init__(self, stdscr, program_name, cpu):
-        self.console_win = ConsoleWindow(CONSOLE_H, CONSOLE_W, CONSOLE_Y, CONSOLE_X, program_name, cpu)
-        self.status_win = StatusWindow(STATUS_H, STATUS_W, STATUS_Y, STATUS_X, cpu)
-        self.memory_win = MemoryWindow(MEMORY_H, MEMORY_W, MEMORY_Y, MEMORY_X, cpu)
-        self.action_win = ActionWindow(ACTION_H, ACTION_W, ACTION_Y, ACTION_X)
+    def __init__(self, program_name, cpu, refresh_rate=60):
+        self.term = cpu.term
+        self.refresh_rate = refresh_rate
+        self.console_win = ConsoleWindow(self.term, CONSOLE_H, CONSOLE_W, CONSOLE_Y, CONSOLE_X, program_name, cpu)
+        self.status_win = StatusWindow(self.term, STATUS_H, STATUS_W, STATUS_Y, STATUS_X, cpu)
+        self.memory_win = MemoryWindow(self.term, MEMORY_H, MEMORY_W, MEMORY_Y, MEMORY_X, cpu)
+        self.action_win = ActionWindow(self.term, ACTION_H, ACTION_W, ACTION_Y, ACTION_X)
         self.windows = [self.console_win, self.status_win, self.memory_win, self.action_win]
-        curs_set(0) # Hide cursor
-        noecho() # Don't echo keyboard inputs
-        cbreak() #Don't wait for 'Enter' key
-        nodelay(stdscr, True) # Non-blocking input
-        use_default_colors()
 
-    def draw(self):
+        for window in self.windows:
+            window.draw_border()
+            window.flush()
+
+    def refresh(self):
         for window in self.windows:
             window.draw_contents()
-            window.draw_border()
-            wrefresh(window.win)
+            window.flush()

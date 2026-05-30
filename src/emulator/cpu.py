@@ -1,14 +1,15 @@
-from bus import Bus
-from devices.memory import MemoryDevice
-from devices.console import ConsoleDevice
-from devices.keyboard import KeyboardDevice
+from .bus import Bus
+from .devices.memory import MemoryDevice
+from .devices.console import ConsoleDevice
+from .devices.keyboard import KeyboardDevice
 from time import sleep
-
+from .ui.input import InputThread
 
 class CPU:
-    def __init__(self, stdscr):
+    def __init__(self, term=None):
+        self.term = term
         self.clock_cycle = 0
-        self.halted = False
+        self.stop = False
         self.reg = [0] * 9 # R0 - R6, SP, PC (16-bit)
         self.sp = 0xEFFF # Stack grows downwards
         self.pc = 0
@@ -19,13 +20,22 @@ class CPU:
             "V": 0  # Overflow
         }
         self.init_devices(device_tick_rate=60)
+        self.init_input_thread()
 
     def init_devices(self, device_tick_rate):
         self.device_tick_rate = device_tick_rate
         self.bus = Bus()
         self.bus.attach_device(MemoryDevice("memory", 0x0000, 0xEFFF))
-        self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF003))
-        self.bus.attach_device(KeyboardDevice("keyboard", 0xF004, 0xF005))
+        if self.term:
+            self.bus.attach_device(ConsoleDevice("console", 0xF000, 0xF003))
+            self.bus.attach_device(KeyboardDevice("keyboard", 0xF004, 0xF005))
+
+    def init_input_thread(self):
+        self.paused = False
+        self.step_once = False
+        if self.term:
+            self.input_thread = InputThread(self)
+            self.input_thread.start()
 
     def run(self, steps=-1, max_cycles=-1, dump_state=False, ui=None):
         while steps != 0:
@@ -33,15 +43,20 @@ class CPU:
                 raise RuntimeError("Max cycles exceeded!")
             instr = self.fetch_word()
             self.decode_execute(instr)
-            if self.halted:
+
+            if self.stop:
                 break
+            if self.paused:
+                if self.step_once:
+                    self.step_once = False
+                else:
+                    sleep(0.01)
+                    continue
             if (self.clock_cycle % self.device_tick_rate) == 0:
                 for device in self.bus.devices:
                     device.tick()
-            if ui and self.clock_cycle % 60 == 0:
-                ui.draw()
-            if dump_state:
-                self.dump_state()
+            if ui and self.clock_cycle % ui.refresh_rate == 0:
+                ui.refresh()
             if steps > 0:
                 steps -= 1
             # sleep(0.001)
@@ -57,7 +72,7 @@ class CPU:
             if opcode == 0b0000: # NOP
                 return
             elif opcode == 0b0001: # HALT
-                self.halted = True
+                self.stop = True
             elif opcode == 0b0010: # RET
                 return_addr = self.pop_word()
                 self.update_program_counter(return_addr)
@@ -257,13 +272,6 @@ class CPU:
         self.bus.write_word(self.sp-1, word)
         self.sp = self.update_stack_addr(offset=-2)
 
-    def dump_state(self, data_format="hex"):
-        print("Cycle:", self.clock_cycle)
-        print("Registers:", [f"{get_reg_name(rN)}: {format_num(r, data_format)}" for rN, r in enumerate(self.reg)])
-        print("Flags:", self.flags)
-        print("Next PC:", format_num(self.pc, "hex")) # PC after running the instruction (points to the instruction that gets executed next)
-        print("---------------------------------------")
-
     @property
     def sp(self):
         return self.reg[7]
@@ -279,7 +287,6 @@ class CPU:
         self.reg[8] = value
 
 def to_signed(value, bits):
-    """Interpret value (unsigned) as signed with `bits` bits."""
     sign = 1 << (bits - 1)
     return (value ^ sign) - sign
 

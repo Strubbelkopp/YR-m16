@@ -1,4 +1,4 @@
-from devices.device import Device
+from .device import Device
 
 class MemoryDevice(Device):
     def __init__(self, name, min_address, max_address, io_type="rw"):
@@ -8,11 +8,11 @@ class MemoryDevice(Device):
         self.io_type = io_type
 
     def read_byte(self, addr):
-        return self.data[addr]
+        return self.data[addr - self.min_address]
 
     def write_byte(self, addr, value):
         if self.io_type != "ro":
-            self.data[addr] = value
+            self.data[addr - self.min_address] = value & 0xFF
 
     def load_program(self, program, base_addr=0x0000):
         for i, byte in enumerate(program):

@@ -1,4 +1,4 @@
-from devices.device import Device
+from .device import Device
 
 class ConsoleDevice(Device):
     def __init__(self, name, min_address, max_address, width=80, height=24):

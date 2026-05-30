@@ -1,6 +1,6 @@
 from queue import Queue
-from devices.device import Device
-from unicurses import getch
+import threading
+from .device import Device
 
 # Internal registers
 KEYBRD_DATA = 0
@@ -12,36 +12,35 @@ class KeyboardDevice(Device):
     def __init__(self, name, min_address, max_address):
         super().__init__(name, min_address, max_address, io_type="ro")
         self.input_buffer = Queue()
-        self.status = 0 # Status register
+        self.status = 0  # Status register
+        self.lock = threading.Lock()
 
     def read_byte(self, addr):
         index = addr - self.min_address
         if index == KEYBRD_DATA:
-            data = self.input_buffer.get_nowait()
-            if self.input_buffer.empty() and (self.status & DATA_READY):
-                self.status ^= DATA_READY # Clear data ready flag, if set
+            with self.lock:
+                data = self.input_buffer.get_nowait()
+                if self.input_buffer.empty():
+                    self.status &= ~DATA_READY # Clear data ready flag
             return data
         elif index == KEYBRD_STATUS:
-            return self.status
+            with self.lock:
+                return self.status
 
-    def tick(self):
-        ch = getch()
-        if ch != -1:
-            for byte in get_key_code(self, ch):
-                self.input_buffer.put(byte)
-            self.status |= DATA_READY # Set data ready flag
-        super().tick()
 
-def get_key_code(self, key):
-    if 0 <= key <= 255:
-        return bytes([key])
-    else:
+def get_key_code(key):
+    if key.is_sequence:
         EXTENDED_KEY_MAP = {
-            3:  0x48,  # Up Arrow
-            2:  0x50,  # Down Arrow
-            4:  0x4B,  # Left Arrow
-            5:  0x4D,  # Right Arrow
-            7:  0x08,  # Backspace
-            74: 0x53,  # Delete
+            'KEY_UP': 0x48,
+            'KEY_DOWN': 0x50,
+            'KEY_LEFT': 0x4B,
+            'KEY_RIGHT': 0x4D,
+            'KEY_BACKSPACE': 0x08,
+            'KEY_DELETE': 0x53,
         }
-        return bytes([0xE0, EXTENDED_KEY_MAP.get(key & 0xFF, 0x00)])
+        code = EXTENDED_KEY_MAP.get(key.name)
+        if code is not None:
+            return bytes([0xE0, code])
+        return b''
+    else:
+        return bytes([ord(key.value)])
