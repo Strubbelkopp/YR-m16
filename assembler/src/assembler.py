@@ -82,8 +82,12 @@ class Assembler():
                 instruction |= ADDRESSING_MODES[addressing_mode]
             elif addressing_mode == "reg":
                 reg = operands[0]["value"]
-                offset = 3 if mnemonic in ["PUSHB", "PUSH"] else 7 # Push instructions use 4-bit field for their source register
-                instruction |= reg << offset
+                if (mnemonic in ["PUSHB", "PUSH"]): # Push instructions use 4-bit field for their source register
+                    instruction |= reg << 3
+                else:
+                    src_reg = operands[1]["value"]
+                    instruction |= reg << 7
+                    instruction |= src_reg << 3
                 instruction |= ADDRESSING_MODES[addressing_mode]
             elif addressing_mode == "indirect_reg":
                 reg = operands[0]["value"]
