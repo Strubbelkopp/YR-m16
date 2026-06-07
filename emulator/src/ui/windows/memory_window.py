@@ -10,7 +10,8 @@ class MemoryWindow(Window):
         ]
         self.memory = cpu.bus.memory
 
-        self.observe_addr = 0xC000
+        # self.observe_addr = 0xEF70 # Stack
+        self.observe_addr = 0x1000
 
     def draw_contents(self):
         start_addr = min(self.observe_addr, self.memory.max_address+1)

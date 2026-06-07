@@ -121,7 +121,7 @@ class Parser():
                 value = f"{self.current_scope}{operand}"
                 parsed_operand.append({"type": "symbol_ref", "value": value})
                 addressing_mode = "imm16"
-            elif operand.startswith(("'", '"')) & operand.endswith(("'", '"')):
+            elif operand.startswith(("'", '"')) and operand.endswith(("'", '"')):
                 value = self.parse_string(operand)[0]
                 parsed_operand.append({"type": "number", "value": value})
                 addressing_mode = self.infer_imm_mode(value)

@@ -1,3 +1,5 @@
+@import "programs/lib.asm"
+
 @let WIDTH = 80
 @let HEIGHT = 24
 @let DISPLAY_BUFFER_A = 0xC000
@@ -10,18 +12,25 @@
 @let ALIVE = '@'
 @let CONSOLE_BASE_REG = 0xF000
 
-@let front_buffer = 0x1000
-@let back_buffer = 0x1002
-@let current_state_buffer = 0x1004
-@let new_state_buffer = 0x1006
+@let front_buffer = 0x1000 ; 2 Bytes
+@let back_buffer = 0x1002 ; 2 Bytes
+@let current_state_buffer = 0x1004 ; 2 Bytes
+@let new_state_buffer = 0x1006 ; 2 Bytes
+@let generation_ptr = 0x1008 ; 2 Bytes
+@let generation_bcd_ptr = 0x100A ; 6 Bytes (5 ASCII digits + null terminator)
 
+@let generation = r6
 main:
     call init
     call copy_state_to_display
     call swap_buffers
 .loop:
+    load generation, [generation_ptr]
+    add generation, 1
+    store generation, [generation_ptr]
     call calculate_new_generation
     call copy_state_to_display
+    call print_status_bar
     call swap_buffers
     jmp .loop
 .end:
@@ -32,6 +41,8 @@ main:
 @let state = r5
 @let generation = r6
 init:
+    mov generation, 0                           ; Initialize generation counter & write it to memory
+    store generation, [generation_ptr]
     mov current_cell, DISPLAY_BUFFER_A          ; Initialize display buffer addresses
     store current_cell, [front_buffer]
     mov new_cell, DISPLAY_BUFFER_B
@@ -225,3 +236,22 @@ glider_gun:
     @data 0x01, 0xFB, 0x01, 0xFD, 0x01, 0xFE, 0x02, 0x03, 0x02, 0x05, 0x02, 0x49, 0x02, 0x4F, 0x02, 0x57
     @data 0x02, 0x9C, 0x02, 0xA0, 0x02, 0xEF, 0x02, 0xF0
     @data 0x00, 0x00
+
+@let str_ptr = r0
+@let display_buffer_addr = r1
+@let print_position = r2
+print_status_bar:
+    load r1, [generation_ptr]                   ; Convert generation count to BCD string
+    mov r0, generation_bcd_ptr
+    call convert_bcd                            ; Writes "DDDDD\0" into buffer at `generation_bcd_ptr`
+    mov r0, status_bar_generation_str           ; Print generation string
+    load r1, [back_buffer]
+    mov r2, 1840 ; WIDTH * (HEIGHT-1)
+    call print
+    mov r0, generation_bcd_ptr                  ; Print BCD generation count
+    mov r2, 0                                   ; Continue printing from the position of the previous print statement
+    call print
+    ret
+
+status_bar_generation_str:
+    @data "Generation: \0"

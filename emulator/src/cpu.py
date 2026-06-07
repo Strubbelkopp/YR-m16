@@ -72,7 +72,7 @@ class CPU:
             if opcode == 0b0000: # NOP
                 return
             elif opcode == 0b0001: # HALT
-                self.stop = True
+                self.paused = True
             elif opcode == 0b0010: # RET
                 return_addr = self.pop_word()
                 self.update_program_counter(return_addr)
@@ -161,7 +161,7 @@ class CPU:
             self.update_program_counter(addr)
         elif opcode == 0x2 and not self.flags["Z"]: # JNZ/JNE
             self.update_program_counter(addr)
-        elif opcode == 0x3 and self.flags["N"] and not self.flags["Z"]: # JLT
+        elif opcode == 0x3 and self.flags["N"]: # JLT
             self.update_program_counter(addr)
         elif opcode == 0x4 and not self.flags["N"] and not self.flags["Z"]: # JGT
             self.update_program_counter(addr)
